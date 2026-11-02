@@ -1,0 +1,579 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="電子契約書">
+<link rel="manifest" href="./manifest.json">
+<link rel="apple-touch-icon" href="./apple-touch-icon.png">
+<title>電子契約書｜GOEN</title>
+<style>
+  :root{ --bg:#f7f5f1; --card:#fff; --ink:#1b1b1b; --sub:#666; --line:#d9d4cc; --navy:#1d4e89; --red:#c0392b; --green:#2e7d32; --gold:#e6b43c; }
+  *{ box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  [hidden]{ display:none !important; }
+  html,body{ margin:0; height:100%; background:var(--bg); color:var(--ink); font-family:-apple-system,"Hiragino Sans","Hiragino Kaku Gothic ProN",sans-serif; font-size:18px; }
+  .wrap{ position:absolute; inset:0; overflow-y:auto; -webkit-overflow-scrolling:touch; overscroll-behavior:contain; padding:16px 16px 50vh; }
+  .top{ display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:12px; }
+  .top h1{ font-size:20px; margin:0; color:var(--navy); }
+  .top .who{ font-size:14px; color:var(--sub); }
+  .card{ background:var(--card); border:1px solid var(--line); border-radius:14px; padding:18px; margin-bottom:14px; }
+  h2{ font-size:22px; margin:0 0 12px; }
+  h3{ font-size:17px; margin:18px 0 8px; color:var(--navy); }
+  label.f{ display:block; font-weight:600; margin:14px 0 6px; font-size:17px; }
+  label.f small{ font-weight:400; color:var(--sub); }
+  .req{ color:var(--red); font-size:14px; margin-left:4px; }
+  input[type=text],input[type=tel],input[type=email],input[type=number],input[type=date],textarea,select{
+    width:100%; font:inherit; font-size:20px; padding:12px 14px; border:1.5px solid var(--line); border-radius:10px; background:#fff; color:var(--ink); }
+  textarea{ min-height:96px; }
+  input:focus,textarea:focus,select:focus{ outline:none; border-color:var(--navy); }
+  button{ font-family:inherit; border-radius:12px; border:none; cursor:pointer; }
+  .btn{ display:block; width:100%; min-height:58px; font-size:20px; font-weight:700; padding:14px; color:#fff; background:var(--navy); margin-top:12px; }
+  .btn.sec{ background:#fff; color:var(--navy); border:2px solid var(--navy); }
+  .btn.warn{ background:var(--red); }
+  .btn.ok{ background:var(--green); }
+  .btn:disabled{ opacity:.4; cursor:default; }
+  .row{ display:flex; gap:10px; }
+  .row > *{ flex:1; }
+  .chips{ display:flex; flex-wrap:wrap; gap:8px; }
+  .chip{ min-height:52px; padding:10px 16px; font-size:18px; border:2px solid var(--line); border-radius:12px; background:#fff; color:var(--ink); }
+  .chip.on{ border-color:var(--navy); background:#e8f0fa; color:var(--navy); font-weight:700; }
+  .hint{ color:var(--sub); font-size:15px; margin-top:6px; }
+  .err{ background:#fdecea; color:var(--red); border:1px solid #f5c6c2; border-radius:10px; padding:12px; margin:10px 0; white-space:pre-line; font-size:16px; }
+  .warnbox{ background:#fff7e0; border:1px solid #f1d58a; border-radius:10px; padding:12px; margin:10px 0; font-size:16px; white-space:pre-line; }
+  .total{ font-size:26px; font-weight:800; text-align:right; }
+  .total.neg{ color:var(--red); }
+  .sigbox{ position:relative; border:2px dashed var(--line); border-radius:12px; background:#fff; height:200px; touch-action:none; }
+  .sigbox canvas{ width:100%; height:100%; display:block; border-radius:12px; touch-action:none; }
+  .sighint{ position:absolute; inset:0; display:flex; align-items:center; justify-content:center; color:#bbb; pointer-events:none; font-size:20px; }
+  .sigline{ position:absolute; left:8%; right:8%; bottom:28%; border-bottom:1px solid #ddd; pointer-events:none; }
+  .docbox{ background:#fff; border:1px solid var(--line); border-radius:12px; height:62vh; overflow-y:auto; -webkit-overflow-scrolling:touch; padding:18px; }
+  .doc{ font-size:17px; line-height:1.7; }
+  .doc *{ font-size:inherit !important; line-height:inherit !important; font-family:inherit !important; }
+  .doc p{ margin:0 0 8px; }
+  .doc table{ width:100% !important; border-collapse:collapse; margin:8px 0; }
+  .doc td{ border:1px solid #999; padding:6px 8px; width:auto !important; vertical-align:top; }
+  .doc img{ display:none; }
+  .doc .sigph{ display:inline-block; min-width:160px; color:#999; }
+  .gate{ display:flex; align-items:center; gap:10px; margin-top:12px; color:var(--sub); font-size:16px; }
+  .gate .dot{ width:14px; height:14px; border-radius:50%; background:#ccc; }
+  .gate.done .dot{ background:var(--green); }
+  .overlay{ display:none; position:fixed; inset:0; background:rgba(255,255,255,.85); z-index:9; align-items:center; justify-content:center; font-size:22px; font-weight:700; color:var(--navy); text-align:center; padding:20px; }
+  table.list{ width:100%; border-collapse:collapse; font-size:16px; }
+  table.list th,table.list td{ border-bottom:1px solid var(--line); padding:10px 6px; text-align:left; vertical-align:top; }
+  table.list a{ color:var(--navy); font-weight:700; }
+  .center{ text-align:center; }
+  .big{ font-size:24px; font-weight:800; }
+  .pill{ display:inline-block; background:#e8f0fa; color:var(--navy); border-radius:999px; padding:4px 12px; font-size:14px; font-weight:700; }
+  @media (min-width:900px){ .wrap{ padding-left:max(16px, calc(50vw - 440px)); padding-right:max(16px, calc(50vw - 440px)); } }
+</style>
+</head>
+<body>
+<div class="wrap" id="wrap">
+  <div class="top">
+    <h1>電子契約書 <span class="pill" id="modeTag" hidden>練習モード</span></h1>
+    <div class="who" id="who"></div>
+  </div>
+
+  <!-- ログイン -->
+  <section id="s-login" class="card">
+    <h2>ログイン</h2>
+    <p>会社から登録してもらった Google（Gmail）アカウントでログインしてください。</p>
+    <div id="gsiBtn"></div>
+    <div id="loginErr" class="err" hidden></div>
+    <p class="hint">初めて使うiPadでは、Googleのログイン画面が開きます。ログイン後はこの画面に戻ります。</p>
+  </section>
+
+  <!-- ホーム -->
+  <section id="s-home" hidden>
+    <div class="card">
+      <h2>はじめる</h2>
+      <div id="tplWarn" class="warnbox" hidden></div>
+      <button class="btn" id="btnNew">新しい契約書を作る</button>
+      <button class="btn sec" id="btnResume" hidden>入力途中の契約書を再開する</button>
+      <button class="btn sec" id="btnList">過去の契約を探す</button>
+    </div>
+    <div class="card">
+      <p class="hint">保存先：共有ドライブ「GOEN様_小口社長」／ その月のフォルダ ／ 90_その他 ／ 電子契約書</p>
+      <button class="btn sec" id="btnLogout" style="min-height:48px;font-size:16px">ログアウト</button>
+    </div>
+  </section>
+
+  <!-- 入力 -->
+  <section id="s-form" hidden>
+    <div class="card">
+      <h2>1. 入力 <span class="hint" style="display:inline">（スタッフが入力）</span></h2>
+      <div class="row">
+        <div><label class="f">契約番号</label><input type="text" id="contractNo" readonly></div>
+        <div><label class="f">契約日<span class="req">必須</span></label><input type="date" id="contractDate"></div>
+      </div>
+
+      <h3>お客様（甲）</h3>
+      <label class="f">ご住所<span class="req">必須</span></label><input type="text" id="custAddress" autocomplete="off">
+      <label class="f">お名前<span class="req">必須</span></label><input type="text" id="custName" autocomplete="off">
+      <label class="f">電話番号<span class="req">必須</span></label><input type="tel" id="custTel" autocomplete="off">
+      <label class="f">メールアドレス <small>（控えをメールで送るときは必須）</small></label><input type="email" id="custEmail" autocomplete="off" inputmode="email">
+
+      <h3>GOEN担当者（乙）</h3>
+      <select id="staff"></select>
+
+      <h3>作業内容<span class="req">必須</span></h3>
+      <div class="chips" id="works"></div>
+      <div id="worksOtherWrap" hidden><label class="f">その他の内容<span class="req">必須</span></label><input type="text" id="worksOther"></div>
+
+      <label class="f">作業の範囲 <small>（お部屋・品物・残すもの）</small><span class="req">必須</span></label>
+      <textarea id="scope" placeholder="例：2階の全部屋。写真と手紙は残す"></textarea>
+
+      <label class="f">作業場所<span class="req">必須</span></label>
+      <input type="text" id="place"><button class="btn sec" id="btnSamePlace" style="min-height:48px;font-size:16px;margin-top:8px">お客様住所と同じ</button>
+
+      <label class="f">作業予定日<span class="req">必須</span></label>
+      <div class="row"><input type="date" id="dateFrom"><input type="date" id="dateTo"></div>
+
+      <label class="f">立ち会い<span class="req">必須</span></label>
+      <div class="chips" data-group="attend"><button class="chip" data-v="あり">あり</button><button class="chip" data-v="なし">なし</button></div>
+
+      <label class="f">鍵のお預かり<span class="req">必須</span></label>
+      <div class="chips" data-group="keyKeep"><button class="chip" data-v="あり">あり</button><button class="chip" data-v="なし">なし</button></div>
+      <div id="keyReturnWrap" hidden><label class="f">鍵の返却日<span class="req">必須</span></label><input type="date" id="keyReturn"></div>
+
+      <h3>料金（税込）</h3>
+      <label class="f">作業費<span class="req">必須</span></label><input type="number" id="fee" inputmode="numeric" placeholder="例：250000">
+      <label class="f">買取額（概算）<span class="req">必須</span> <small>なければ 0</small></label><input type="number" id="buy" inputmode="numeric" value="0">
+      <label class="f">合計お支払い額（自動計算）</label>
+      <div class="total" id="total">0 円</div>
+      <div class="hint" id="totalWarn" hidden style="color:var(--red)">合計がマイナスです。金額を確認してください。</div>
+
+      <label class="f">お支払い方法<span class="req">必須</span></label>
+      <div class="chips" data-group="payMethod"><button class="chip" data-v="現金">現金</button><button class="chip" data-v="振込">銀行振込</button><button class="chip" data-v="カード">クレジットカード一括</button></div>
+      <div id="payDaysWrap" hidden><label class="f">振込の期限（作業完了日から何日以内）<span class="req">必須</span></label><input type="number" id="payDays" inputmode="numeric" value="7"></div>
+
+      <label class="f">探してほしい品物 <small>（任意）</small></label>
+      <textarea id="searchItems" placeholder="例：通帳・印鑑・権利書・写真"></textarea>
+
+      <div id="formErr" class="err" hidden></div>
+      <button class="btn" id="btnToConfirm">お客様に内容を確認してもらう</button>
+      <button class="btn sec" id="btnFormBack">ホームへ戻る（入力は保存されます）</button>
+    </div>
+  </section>
+
+  <!-- 確認 -->
+  <section id="s-confirm" hidden>
+    <div class="card">
+      <h2>2. 内容のご確認</h2>
+      <p class="hint">お客様に画面をお見せして、最後までスクロールしてご確認いただいてください。</p>
+      <div class="docbox" id="docbox"><div class="doc" id="doc">読み込み中…</div></div>
+      <div class="gate" id="gate"><span class="dot"></span><span id="gateText">最後までスクロールすると次へ進めます</span></div>
+      <button class="btn" id="btnToDeliver" disabled>内容を確認しました（次へ）</button>
+      <button class="btn sec" id="btnConfirmBack">入力に戻って直す</button>
+    </div>
+  </section>
+
+  <!-- 受け取り方法 -->
+  <section id="s-deliver" hidden>
+    <div class="card">
+      <h2>3. 控えの受け取り方法</h2>
+      <p>契約書の控え（PDF）をどの方法で受け取りますか？</p>
+      <div class="chips" data-group="deliver" style="flex-direction:column">
+        <button class="chip" data-v="LINE">LINEで受け取る</button>
+        <button class="chip" data-v="メール">メールで受け取る</button>
+        <button class="chip" data-v="紙">紙の控えを希望する</button>
+      </div>
+      <div id="deliverEmailWrap" hidden><label class="f">お客様のメールアドレス<span class="req">必須</span></label><input type="email" id="custEmail2" inputmode="email"></div>
+      <div id="deliverErr" class="err" hidden></div>
+      <button class="btn" id="btnToSign">署名へ進む</button>
+      <button class="btn sec" id="btnDeliverBack">戻る</button>
+    </div>
+  </section>
+
+  <!-- 署名 -->
+  <section id="s-sign" hidden>
+    <div class="card">
+      <h2>4. ご署名</h2>
+      <h3>お客様（甲）のご署名</h3>
+      <p class="hint">枠の中に指でお名前をお書きください。</p>
+      <div class="sigbox"><canvas id="sigC"></canvas><div class="sigline"></div><div class="sighint" id="sigCHint">ここに署名</div></div>
+      <button class="btn sec" data-clear="sigC" style="min-height:48px;font-size:16px">書き直す</button>
+
+      <h3>担当者（乙）の署名：<span id="signStaffName"></span></h3>
+      <div class="sigbox"><canvas id="sigS"></canvas><div class="sigline"></div><div class="sighint" id="sigSHint">ここに署名</div></div>
+      <button class="btn sec" data-clear="sigS" style="min-height:48px;font-size:16px">書き直す</button>
+
+      <div class="warnbox" style="margin-top:16px">締結すると内容は固定され、あとから変更できません。</div>
+      <div id="signErr" class="err" hidden></div>
+      <button class="btn ok" id="btnFinalize" disabled>契約を締結する</button>
+      <button class="btn sec" id="btnSignBack">戻る</button>
+    </div>
+  </section>
+
+  <!-- 完了 -->
+  <section id="s-done" hidden>
+    <div class="card center">
+      <div class="big" style="color:var(--green)">契約を締結しました</div>
+      <p id="doneNo" class="big"></p>
+      <p id="doneInfo" class="hint"></p>
+      <div id="doneWarn" class="warnbox" hidden style="text-align:left"></div>
+      <div id="doneLine" hidden>
+        <p>iPadの共有画面が開きます。<b>LINE</b> を選び、お客様のトークへ送ってください。</p>
+        <button class="btn" id="btnShareLine">LINEで控えを送る（共有）</button>
+      </div>
+      <div id="doneMail" hidden><p>お客様のメールアドレスへ控え（PDF）を送信しました。</p></div>
+      <div id="donePaper" hidden class="warnbox" style="text-align:left"><b>紙の控えをお渡しください。</b><br>控えに署名・押印はしないでください（印刷したものは「控」と表示されます）。</div>
+      <a class="btn sec" id="btnOpenPdf" target="_blank" rel="noopener" style="text-decoration:none;display:flex;align-items:center;justify-content:center">PDFを開く</a>
+      <button class="btn sec" id="btnShareAny">控えを共有・印刷する</button>
+      <button class="btn" id="btnDoneHome">ホームへ戻る</button>
+    </div>
+  </section>
+
+  <!-- 一覧 -->
+  <section id="s-list" hidden>
+    <div class="card">
+      <h2>過去の契約</h2>
+      <div class="row">
+        <div><label class="f">契約番号</label><input type="text" id="qNo" placeholder="GOEN-2026…"></div>
+        <div><label class="f">担当者</label><select id="qStaff"><option value="">すべて</option></select></div>
+      </div>
+      <div class="row">
+        <div><label class="f">契約日（から）</label><input type="date" id="qFrom"></div>
+        <div><label class="f">契約日（まで）</label><input type="date" id="qTo"></div>
+      </div>
+      <div id="qNameWrap" hidden><label class="f">お客様名 <small>（管理者のみ）</small></label><input type="text" id="qName"></div>
+      <button class="btn" id="btnSearch">検索</button>
+      <div id="listErr" class="err" hidden></div>
+      <div id="listOut" style="margin-top:14px"></div>
+      <button class="btn sec" id="btnListBack">ホームへ戻る</button>
+    </div>
+  </section>
+</div>
+<div class="overlay" id="overlay">処理中…</div>
+
+<script src="./logic.js"></script>
+<script>
+// ===== 設定（初回セットアップで入れる）=====
+var GAS_URL = 'https://script.google.com/macros/s/XXXXXXXX/exec';          // GASのウェブアプリURL
+var OAUTH_CLIENT_ID = 'XXXXXXXX.apps.googleusercontent.com';                // Google Cloud のクライアントID
+var MOCK = /[?&]mock=1/.test(location.search);                              // 練習モード（GASを呼ばない）
+</script>
+<script>
+(function(){
+  var $ = function(id){ return document.getElementById(id); };
+  var state = { session:'', user:null, staffList:['小口（代表）'], contract:null, pdfBlob:null, templateHtml:'' };
+  var SCREENS = ['login','home','form','confirm','deliver','sign','done','list'];
+
+  // ---- 画面切替 ----
+  function show(name){
+    SCREENS.forEach(function(s){ $('s-'+s).hidden = (s !== name); });
+    $('wrap').scrollTop = 0;
+    if(name === 'sign') setTimeout(function(){ setupCanvas('sigC'); setupCanvas('sigS'); }, 50);
+  }
+  function busy(on, text){ $('overlay').textContent = text || '処理中…'; $('overlay').style.display = on ? 'flex' : 'none'; }
+  function showErr(id, msg){ var el = $(id); el.hidden = !msg; el.textContent = msg || ''; }
+
+  // ---- GASとの通信 ----
+  function api(fn, args){
+    if(MOCK) return mockApi(fn, args || []);
+    return fetch(GAS_URL, { method:'POST', body: JSON.stringify({ fn: fn, args: args || [], session: state.session }) })
+      .then(function(r){ return r.json(); })
+      .then(function(j){
+        if(j && j.ok) return j.result;
+        var msg = (j && j.error) || '不明なエラー';
+        if(msg.indexOf('有効期限') >= 0){ logout(); }
+        throw new Error(msg);
+      }, function(e){ throw new Error('通信できませんでした。電波の良い場所でもう一度お試しください（' + (e && e.message || e) + '）'); });
+  }
+
+  // ---- ログイン ----
+  function loadSession(){
+    try{ var s = JSON.parse(localStorage.getItem('ec_session') || 'null'); if(s && s.exp > Date.now()){ state.session = s.token; state.user = s.user; state.staffList = s.staffList || state.staffList; } }catch(_){}
+  }
+  function saveSession(token, user, staffList){
+    state.session = token; state.user = user; state.staffList = staffList;
+    try{ localStorage.setItem('ec_session', JSON.stringify({ token: token, user: user, staffList: staffList, exp: Date.now() + 11*3600*1000 })); }catch(_){}
+  }
+  function logout(){ state.session=''; state.user=null; try{ localStorage.removeItem('ec_session'); }catch(_){} $('who').textContent=''; show('login'); }
+  function afterLogin(res){
+    saveSession(res.session, res.user, res.staffList || state.staffList);
+    $('who').textContent = res.user.email + (res.user.isAdmin ? '（管理者）' : '');
+    applyTemplateCheck(res.template);
+    goHome();
+  }
+  function applyTemplateCheck(t){
+    var el = $('tplWarn');
+    if(!t || t.ok){ el.hidden = true; return; }
+    el.hidden = false;
+    el.textContent = '契約書のひな形に問題があります。締結できないので管理者に連絡してください。\n' + (t.error || ('不足している印: ' + t.missing.join(' ') + '\n不明な印: ' + t.unknown.join(' ') + (t.footerOk ? '' : '\nフッターの控え文言がありません')));
+  }
+  function onGoogleCredential(resp){
+    busy(true, 'ログインを確認しています…');
+    api('login', [resp.credential]).then(function(res){ busy(false); afterLogin(res); })
+      .catch(function(e){ busy(false); showErr('loginErr', e.message); });
+  }
+  function initGsi(){
+    if(MOCK){
+      var b = document.createElement('button'); b.className='btn'; b.textContent='（練習）ログインしたことにする';
+      b.onclick = function(){ onGoogleCredential({ credential:'mock' }); };
+      $('gsiBtn').appendChild(b); return;
+    }
+    var s = document.createElement('script'); s.src = 'https://accounts.google.com/gsi/client'; s.async = true;
+    s.onload = function(){
+      google.accounts.id.initialize({ client_id: OAUTH_CLIENT_ID, callback: onGoogleCredential, ux_mode: 'popup', itp_support: true });
+      google.accounts.id.renderButton($('gsiBtn'), { theme:'filled_blue', size:'large', text:'signin_with', shape:'pill', locale:'ja', width: 320 });
+    };
+    s.onerror = function(){ showErr('loginErr', 'Googleのログイン部品を読み込めませんでした。通信を確認してください。'); };
+    document.head.appendChild(s);
+  }
+  $('btnLogout').onclick = logout;
+
+  // ---- ホーム ----
+  function goHome(){
+    $('btnResume').hidden = !loadDraft();
+    show('home');
+  }
+  $('btnNew').onclick = function(){
+    if(loadDraft() && !confirm('入力途中の契約書があります。捨てて新しく作りますか？')) return;
+    busy(true, '契約番号を発行しています…');
+    api('newContract').then(function(r){
+      busy(false);
+      state.contract = emptyContract(r.contractNo, r.contractDate);
+      fillForm(state.contract); saveDraft(); show('form');
+    }).catch(function(e){ busy(false); alert(e.message); });
+  };
+  $('btnResume').onclick = function(){ state.contract = loadDraft(); fillForm(state.contract); show('form'); };
+  $('btnList').onclick = function(){ openList(); };
+
+  // ---- 下書き（端末に保存）----
+  function saveDraft(){ try{ localStorage.setItem('ec_draft', JSON.stringify(state.contract)); }catch(_){} }
+  function loadDraft(){ try{ return JSON.parse(localStorage.getItem('ec_draft') || 'null'); }catch(_){ return null; } }
+  function clearDraft(){ try{ localStorage.removeItem('ec_draft'); }catch(_){} }
+  function emptyContract(no, date){
+    return { contractNo:no, contractDate:date, custAddress:'', custName:'', custTel:'', custEmail:'', staff: state.staffList[0] || '',
+      works:[], worksOther:'', scope:'', place:'', dateFrom:'', dateTo:'', attend:'', keyKeep:'', keyReturn:'', fee:'', buy:'0', payMethod:'', payDays:'7', searchItems:'', deliver:'' };
+  }
+
+  // ---- 入力画面 ----
+  var TEXT_FIELDS = ['contractDate','custAddress','custName','custTel','custEmail','staff','worksOther','scope','place','dateFrom','dateTo','keyReturn','fee','buy','payDays','searchItems'];
+  function buildStatic(){
+    $('staff').innerHTML = ''; $('qStaff').innerHTML = '<option value="">すべて</option>';
+    state.staffList.forEach(function(n){ var o=document.createElement('option'); o.value=n; o.textContent=n; $('staff').appendChild(o); var o2=o.cloneNode(true); $('qStaff').appendChild(o2); });
+    $('works').innerHTML = '';
+    WORK_KEYS.forEach(function(k){ var b=document.createElement('button'); b.className='chip'; b.textContent=k; b.dataset.v=k; b.onclick=function(){ toggleWork(k); }; $('works').appendChild(b); });
+  }
+  function fillForm(c){
+    $('contractNo').value = c.contractNo;
+    TEXT_FIELDS.forEach(function(id){ $(id).value = c[id] == null ? '' : c[id]; });
+    renderChips();
+  }
+  function readForm(){
+    var c = state.contract;
+    TEXT_FIELDS.forEach(function(id){ c[id] = $(id).value; });
+    c.custEmail = c.custEmail.trim();
+    return c;
+  }
+  function toggleWork(k){
+    var c = state.contract, i = c.works.indexOf(k);
+    if(i >= 0) c.works.splice(i,1); else c.works.push(k);
+    renderChips(); saveDraft();
+  }
+  function renderChips(){
+    var c = state.contract;
+    Array.prototype.forEach.call($('works').children, function(b){ b.classList.toggle('on', c.works.indexOf(b.dataset.v) >= 0); });
+    $('worksOtherWrap').hidden = c.works.indexOf('その他') < 0;
+    document.querySelectorAll('[data-group]').forEach(function(g){
+      var key = g.dataset.group;
+      Array.prototype.forEach.call(g.children, function(b){ b.classList.toggle('on', c[key] === b.dataset.v); });
+    });
+    $('keyReturnWrap').hidden = c.keyKeep !== 'あり';
+    $('payDaysWrap').hidden = c.payMethod !== '振込';
+    $('deliverEmailWrap').hidden = c.deliver !== 'メール';
+    updateTotal();
+  }
+  document.querySelectorAll('[data-group]').forEach(function(g){
+    Array.prototype.forEach.call(g.children, function(b){
+      b.onclick = function(){ state.contract[g.dataset.group] = b.dataset.v; renderChips(); saveDraft(); };
+    });
+  });
+  function updateTotal(){
+    var t = calcTotal($('fee').value, $('buy').value);
+    $('total').textContent = yen(t) + ' 円';
+    $('total').classList.toggle('neg', t < 0);
+    $('totalWarn').hidden = !(t < 0);
+  }
+  TEXT_FIELDS.forEach(function(id){ $(id).addEventListener('input', function(){ readForm(); if(id==='fee'||id==='buy') updateTotal(); saveDraft(); }); $(id).addEventListener('change', function(){ readForm(); saveDraft(); }); });
+  $('btnSamePlace').onclick = function(){ $('place').value = $('custAddress').value; readForm(); saveDraft(); };
+  $('btnFormBack').onclick = function(){ readForm(); saveDraft(); goHome(); };
+  $('btnToConfirm').onclick = function(){
+    var c = readForm(); saveDraft();
+    var errs = validateContract(c).filter(function(m){ return m.indexOf('受け取り') < 0 && m.indexOf('メールで送るには') < 0; });
+    if(errs.length){ showErr('formErr', errs.join('\n')); $('formErr').scrollIntoView({ block:'center' }); return; }
+    showErr('formErr', ''); openConfirm();
+  };
+  // Enterで次の欄へ・欄の外に触れたらキーボードを閉じる
+  document.addEventListener('touchstart', function(e){
+    var a = document.activeElement;
+    if(!a || !(a.tagName === 'INPUT' || a.tagName === 'TEXTAREA' || a.tagName === 'SELECT')) return;
+    if(e.target.closest && e.target.closest('input,textarea,select')) return;
+    a.blur();
+  }, { passive:true });
+
+  // ---- 確認画面 ----
+  function getTemplateHtml(){
+    if(state.templateHtml) return Promise.resolve(state.templateHtml);
+    return api('getTemplateHtml').then(function(r){ state.templateHtml = r.html; return r.html; });
+  }
+  function escapeHtml(s){ return String(s).replace(/[&<>"]/g, function(ch){ return { '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[ch]; }).replace(/\n/g, '<br>'); }
+  function openConfirm(){
+    show('confirm'); $('doc').textContent = '読み込み中…'; setGate(false);
+    busy(true, '契約書を用意しています…');
+    getTemplateHtml().then(function(html){
+      busy(false);
+      var map = buildReplaceMap(state.contract, state.contract.contractDate, '');
+      map['《甲署名日》'] = '（締結時に記録）'; map['《乙署名日》'] = '（締結時に記録）';
+      if(!state.contract.deliver){ ['LINE','メール','紙'].forEach(function(k){ map['《チェック:受取'+k+'》'] = '☐'; }); map['《承諾メール》'] = '（次の画面で選択）'; }
+      Object.keys(map).forEach(function(k){ html = html.split(k).join(escapeHtml(map[k])); });
+      html = html.split('《署名_甲》').join('<span class="sigph">（ここにお客様の署名）</span>').split('《署名_乙》').join('<span class="sigph">（ここに担当者の署名）</span>');
+      $('doc').innerHTML = html;
+      setTimeout(checkGate, 100);
+    }).catch(function(e){ busy(false); $('doc').textContent = '読み込めませんでした：' + e.message; });
+  }
+  function setGate(ok){ $('gate').classList.toggle('done', ok); $('btnToDeliver').disabled = !ok; $('gateText').textContent = ok ? '最後まで確認しました' : '最後までスクロールすると次へ進めます'; }
+  function checkGate(){ var b = $('docbox'); if(b.scrollTop + b.clientHeight >= b.scrollHeight - 24) setGate(true); }
+  $('docbox').addEventListener('scroll', checkGate);
+  $('btnConfirmBack').onclick = function(){ show('form'); };
+  $('btnToDeliver').onclick = function(){ $('custEmail2').value = state.contract.custEmail; renderChips(); show('deliver'); };
+
+  // ---- 受け取り方法 ----
+  $('custEmail2').addEventListener('input', function(){ state.contract.custEmail = $('custEmail2').value.trim(); $('custEmail').value = state.contract.custEmail; saveDraft(); });
+  $('btnDeliverBack').onclick = function(){ openConfirm(); };
+  $('btnToSign').onclick = function(){
+    var errs = validateContract(state.contract);
+    if(errs.length){ showErr('deliverErr', errs.join('\n')); return; }
+    showErr('deliverErr', ''); $('signStaffName').textContent = state.contract.staff; show('sign');
+  };
+
+  // ---- 署名 ----
+  var sigs = {};
+  function setupCanvas(id){
+    var cv = $(id), ctx = cv.getContext('2d');
+    var r = cv.getBoundingClientRect(), dpr = window.devicePixelRatio || 1;
+    if(r.width === 0) return;
+    cv.width = Math.round(r.width * dpr); cv.height = Math.round(r.height * dpr);
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+    ctx.lineWidth = 3; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.strokeStyle = '#111';
+    sigs[id] = { has:false, drawing:false, last:null, ctx:ctx };
+    $(id+'Hint').style.display = 'flex'; updateFinalizeBtn();
+  }
+  function pos(cv, e){ var r = cv.getBoundingClientRect(); return { x:e.clientX - r.left, y:e.clientY - r.top }; }
+  ['sigC','sigS'].forEach(function(id){
+    var cv = $(id);
+    cv.addEventListener('pointerdown', function(e){
+      var s = sigs[id]; if(!s) return; e.preventDefault(); s.drawing = true; s.last = pos(cv, e);
+      try{ cv.setPointerCapture(e.pointerId); }catch(_){}
+      s.ctx.beginPath(); s.ctx.arc(s.last.x, s.last.y, 1.2, 0, Math.PI*2); s.ctx.fillStyle = '#111'; s.ctx.fill();
+      if(!s.has){ s.has = true; $(id+'Hint').style.display = 'none'; updateFinalizeBtn(); }
+    });
+    cv.addEventListener('pointermove', function(e){
+      var s = sigs[id]; if(!s || !s.drawing) return; e.preventDefault();
+      var p = pos(cv, e); s.ctx.beginPath(); s.ctx.moveTo(s.last.x, s.last.y); s.ctx.lineTo(p.x, p.y); s.ctx.stroke(); s.last = p;
+    });
+    ['pointerup','pointercancel','pointerleave'].forEach(function(t){ cv.addEventListener(t, function(){ if(sigs[id]) sigs[id].drawing = false; }); });
+  });
+  document.querySelectorAll('[data-clear]').forEach(function(b){ b.onclick = function(){ setupCanvas(b.dataset.clear); }; });
+  window.addEventListener('resize', function(){ ['sigC','sigS'].forEach(function(id){ if(sigs[id] && !sigs[id].has) setupCanvas(id); }); });
+  function updateFinalizeBtn(){ $('btnFinalize').disabled = !(sigs.sigC && sigs.sigC.has && sigs.sigS && sigs.sigS.has); }
+  function sigData(id){
+    var cv = $(id), out = document.createElement('canvas');
+    out.width = cv.width; out.height = cv.height;
+    var o = out.getContext('2d'); o.fillStyle = '#fff'; o.fillRect(0,0,out.width,out.height); o.drawImage(cv,0,0);
+    return out.toDataURL('image/png');
+  }
+  $('btnSignBack').onclick = function(){ show('deliver'); };
+  $('btnFinalize').onclick = function(){
+    if(!confirm('契約を締結します。締結後は内容を変更できません。よろしいですか？')) return;
+    var c = Object.assign({}, state.contract, { sigCustomer: sigData('sigC'), sigStaff: sigData('sigS') });
+    busy(true, 'PDFを作成して保存しています…\n（20秒ほどかかります）');
+    api('finalize', [c]).then(function(r){
+      busy(false); clearDraft(); showDone(r);
+    }).catch(function(e){ busy(false); showErr('signErr', e.message); });
+  };
+
+  // ---- 完了 ----
+  function b64ToBlob(b64){ var bin = atob(b64), arr = new Uint8Array(bin.length); for(var i=0;i<bin.length;i++) arr[i] = bin.charCodeAt(i); return new Blob([arr], { type:'application/pdf' }); }
+  function showDone(r){
+    var c = state.contract;
+    state.pdfBlob = r.pdfBase64 ? b64ToBlob(r.pdfBase64) : null;
+    state.pdfName = r.fileName;
+    $('doneNo').textContent = c.contractNo;
+    $('doneInfo').textContent = '締結日時 ' + r.signedAt + '　保存先：' + (r.folder || '') + '　ファイル：' + r.fileName;
+    $('doneWarn').hidden = !(r.warnings && r.warnings.length); $('doneWarn').textContent = (r.warnings || []).join('\n');
+    $('doneLine').hidden = c.deliver !== 'LINE'; $('doneMail').hidden = c.deliver !== 'メール'; $('donePaper').hidden = c.deliver !== '紙';
+    $('btnOpenPdf').href = r.url || '#';
+    show('done');
+  }
+  function sharePdf(){
+    if(!state.pdfBlob){ alert('PDFの控えがこの画面にありません。「PDFを開く」からドライブで共有してください。'); return; }
+    var file = new File([state.pdfBlob], state.pdfName, { type:'application/pdf' });
+    if(navigator.share && (!navigator.canShare || navigator.canShare({ files:[file] }))){
+      navigator.share({ files:[file], title:'作業契約書の控え', text:'株式会社GOEN 作業契約書の控え（' + state.contract.contractNo + '）' }).catch(function(){});
+    } else {
+      var a = document.createElement('a'); a.href = URL.createObjectURL(state.pdfBlob); a.target = '_blank'; a.rel = 'noopener'; a.click();
+    }
+  }
+  $('btnShareLine').onclick = sharePdf; $('btnShareAny').onclick = sharePdf;
+  $('btnDoneHome').onclick = function(){ state.contract = null; state.pdfBlob = null; goHome(); };
+
+  // ---- 一覧 ----
+  function openList(){ $('qNameWrap').hidden = !(state.user && state.user.isAdmin); $('listOut').innerHTML = ''; show('list'); }
+  $('btnListBack').onclick = goHome;
+  $('btnSearch').onclick = function(){
+    var q = { no:$('qNo').value.trim(), from:$('qFrom').value, to:$('qTo').value, staff:$('qStaff').value, name:$('qName').value.trim() };
+    busy(true, '検索しています…');
+    api('listContracts', [q]).then(function(r){
+      busy(false); showErr('listErr', '');
+      if(!r.rows.length){ $('listOut').innerHTML = '<p class="hint">見つかりませんでした。</p>'; return; }
+      var h = '<table class="list"><tr><th>契約番号</th><th>契約日</th><th>担当者</th>' + (r.isAdmin ? '<th>お客様</th>' : '') + '<th>合計</th><th></th></tr>';
+      r.rows.forEach(function(x){
+        h += '<tr><td>' + escapeHtml(x.contractNo) + '<br><span class="hint">' + escapeHtml(x.works) + '・' + escapeHtml(x.deliver) + '</span></td><td>' + escapeHtml(x.contractDate) + '</td><td>' + escapeHtml(x.staff) + '</td>' +
+          (r.isAdmin ? '<td>' + escapeHtml(x.custName) + '</td>' : '') + '<td>' + yen(x.total) + '円</td><td><a href="' + escapeHtml(x.url) + '" target="_blank" rel="noopener">PDF</a></td></tr>';
+      });
+      $('listOut').innerHTML = h + '</table>';
+    }).catch(function(e){ busy(false); showErr('listErr', e.message); });
+  };
+
+  // ---- 練習モード（GASなしで画面の流れを試す）----
+  function mockApi(fn, args){
+    var delay = function(v){ return new Promise(function(res){ setTimeout(function(){ res(v); }, 300); }); };
+    if(fn === 'login') return delay({ session:'mock', user:{ email:'test@example.com', isAdmin:true }, staffList:['小口（代表）'], template:{ ok:true } });
+    if(fn === 'newContract'){ var d = new Date(); var ymd = d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2)+'-'+('0'+d.getDate()).slice(-2); return delay({ contractNo: contractNo(ymd, 1), contractDate: ymd }); }
+    if(fn === 'getTemplateHtml') return delay({ html: MOCK_TEMPLATE });
+    if(fn === 'finalize'){ var c = args[0]; var errs = validateContract(c); if(errs.length) return Promise.reject(new Error(errs.join('\n')));
+      return delay({ fileName: c.contractNo + '_' + c.contractDate.replace(/-/g,'') + '.pdf', url:'#', folder:'2026年11月 / 90_その他 / 電子契約書', pdfBase64:'', signedAt:'（練習）', warnings:['練習モードのため保存・送信はしていません'] }); }
+    if(fn === 'listContracts') return delay({ isAdmin:true, rows:[{ contractNo:'GOEN-20261101-001', contractDate:'2026-11-01', signedAt:'2026-11-01 14:05', staff:'小口（代表）', custName:'テスト 太郎', works:'遺品整理', total:220000, deliver:'メール', url:'#' }] });
+    return Promise.reject(new Error('練習モードにない機能: ' + fn));
+  }
+  var MOCK_TEMPLATE = '<p><b>【控】印刷した本書は電子契約書の控え（写し）です。</b></p><p style="text-align:center;font-weight:bold">作業契約書</p><p style="text-align:right">契約番号：《契約番号》　契約日：《契約日》</p>' +
+    '<table><tr><td>甲 ご住所</td><td>《甲住所》</td></tr><tr><td>甲 お名前</td><td>《甲氏名》</td></tr><tr><td>乙 担当者</td><td>《乙担当者》</td></tr></table>' +
+    '<p>《チェック:遺品整理》遺品整理　《チェック:生前整理》生前整理　《チェック:その他》その他（《その他内容》）</p><p>作業の範囲：《作業範囲》</p>' +
+    '<table><tr><td>作業費</td><td>《作業費》 円</td></tr><tr><td>買取額</td><td>− 《買取額》 円</td></tr><tr><td><b>合計</b></td><td><b>《合計》 円</b></td></tr></table>' +
+    '<p>《チェック:支払現金》現金　《チェック:支払振込》銀行振込（《振込期限日数》日以内）　《チェック:支払カード》カード</p>' +
+    '<p>' + new Array(30).join('この契約に定めのないことや、解釈に迷うことがあるときは、甲乙が誠意をもって話し合って決めます。') + '</p>' +
+    '<table><tr><td style="border:2px solid #cc0000;color:#cc0000"><b>クーリングオフのお知らせ</b><br>この契約が特定商取引法の訪問販売にあたる場合、8日以内であれば無条件で契約を解除できます。</td></tr></table>' +
+    '<p>《チェック:受取LINE》LINE　《チェック:受取メール》電子メール（《承諾メール》）　《チェック:受取紙》紙</p>' +
+    '<table><tr><td>甲</td><td>《署名_甲》</td><td>《甲署名日》</td></tr><tr><td>乙</td><td>《署名_乙》</td><td>《乙署名日》</td></tr></table>';
+
+  // ---- 起動 ----
+  $('modeTag').hidden = !MOCK;
+  loadSession();
+  buildStatic();
+  initGsi();
+  if(state.session && state.user){
+    $('who').textContent = state.user.email + (state.user.isAdmin ? '（管理者）' : '');
+    goHome();
+    api('whoami').then(function(r){ state.staffList = r.staffList || state.staffList; buildStatic(); applyTemplateCheck(r.template); }).catch(function(){});
+  } else {
+    show('login');
+  }
+})();
+</script>
+</body>
+</html>
