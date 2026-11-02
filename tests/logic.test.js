@@ -64,6 +64,8 @@ test('replace map', () => {
   assert.strictEqual(m['《チェック:立会あり》'], '☑');
   assert.strictEqual(m['《チェック:鍵なし》'], '☐');
   assert.strictEqual(m['《チェック:支払振込》'], '☑');
+  assert.ok(!('《チェック:支払カード》' in m));
+  assert.ok(L.validateContract(Object.assign(base(), { payMethod: 'カード' })).some(x => x.includes('お支払い方法')));
   assert.strictEqual(m['《チェック:受取メール》'], '☑');
   assert.strictEqual(m['《振込期限日数》'], '7');
   assert.strictEqual(m['《鍵返却日》'], '令和8年11月7日');

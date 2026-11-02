@@ -1,1 +1,1 @@
-{ "name": "goen-econtract", "private": true, "scripts": { "test": "node --test tests/" } }
+{ "name": "goen-econtract", "private": true, "scripts": { "test": "node --test tests/*.test.js" } }
