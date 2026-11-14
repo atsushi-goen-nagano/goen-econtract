@@ -3,7 +3,7 @@ const assert = require('node:assert');
 const L = require('../gas/Logic.gs');
 
 const base = () => ({
-  contractNo: 'GOEN-20261101-001', contractDate: '2026-11-01',
+  contractNo: '26-0152', contractDate: '2026-11-01',
   custAddress: '長野市○○1-2-3', custName: 'テスト 太郎', custTel: '090-0000-0000', custEmail: 'taro@example.com',
   staff: '小口（代表）', works: ['遺品整理', 'その他'], worksOther: '仏壇の供養',
   scope: '2階の全部屋。写真は残す', place: '長野市○○1-2-3', dateFrom: '2026-11-05', dateTo: '2026-11-06',
@@ -21,11 +21,17 @@ test('yen', () => {
   assert.strictEqual(L.yen(0), '0');
   assert.strictEqual(L.yen(-5000), '-5,000');
 });
-test('calcTotal / monthPrefix / contractNo', () => {
+test('calcTotal / monthPrefix / caseNo', () => {
   assert.strictEqual(L.calcTotal(250000, 30000), 220000);
   assert.strictEqual(L.monthPrefix('2026-11-01'), '2026年11月');
   assert.strictEqual(L.monthPrefix('2027-02-03'), '2027年02月');
-  assert.strictEqual(L.contractNo('2026-11-01', 3), 'GOEN-20261101-003');
+  assert.strictEqual(L.normalizeCaseNo(' ２６－０１５２ '), '26-0152');
+  assert.strictEqual(L.normalizeCaseNo('26-0152-2'), '26-0152-2');
+  assert.ok(L.CASE_NO_RE.test('26-0152') && L.CASE_NO_RE.test('26-0152-2'));
+  assert.ok(!L.CASE_NO_RE.test('GOEN-20261101-001') && !L.CASE_NO_RE.test('260152'));
+  assert.ok(L.validateContract(Object.assign(base(), { contractNo: '' })).some(x => x.includes('案件番号')));
+  assert.ok(L.validateContract(Object.assign(base(), { contractNo: 'abc' })).some(x => x.includes('26-0152')));
+  assert.strictEqual(L.validateContract(Object.assign(base(), { contractNo: '２６-０１５２' })).length, 0);
 });
 test('validate ok', () => {
   assert.deepStrictEqual(L.validateContract(base()), []);
@@ -54,7 +60,7 @@ test('validate conditional', () => {
 });
 test('replace map', () => {
   const m = L.buildReplaceMap(base(), '2026-11-01', '14:05');
-  assert.strictEqual(m['《契約番号》'], 'GOEN-20261101-001');
+  assert.strictEqual(m['《契約番号》'], '26-0152');
   assert.strictEqual(m['《契約日》'], '令和8年11月1日');
   assert.strictEqual(m['《作業費》'], '250,000');
   assert.strictEqual(m['《合計》'], '220,000');

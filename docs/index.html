@@ -105,7 +105,7 @@
     <div class="card">
       <h2>1. 入力 <span class="hint" style="display:inline">（スタッフが入力）</span></h2>
       <div class="row">
-        <div><label class="f">契約番号</label><input type="text" id="contractNo" readonly></div>
+        <div><label class="f">契約番号 <small>（写真アプリの案件番号）</small><span class="req">必須</span></label><input type="text" id="contractNo" placeholder="例：26-0152" autocomplete="off" inputmode="numeric"><button class="btn sec" id="btnPasteNo" style="min-height:48px;font-size:16px;margin-top:8px">コピーした案件番号を貼り付け</button></div>
         <div><label class="f">契約日<span class="req">必須</span></label><input type="date" id="contractDate"></div>
       </div>
 
@@ -332,7 +332,7 @@ var MOCK = /[?&]mock=1/.test(location.search);                              // �
   }
   $('btnNew').onclick = function(){
     if(loadDraft() && !confirm('入力途中の契約書があります。捨てて新しく作りますか？')) return;
-    busy(true, '契約番号を発行しています…');
+    busy(true, '準備しています…');
     api('newContract').then(function(r){
       busy(false);
       state.contract = emptyContract(r.contractNo, r.contractDate);
@@ -352,7 +352,7 @@ var MOCK = /[?&]mock=1/.test(location.search);                              // �
   }
 
   // ---- 入力画面 ----
-  var TEXT_FIELDS = ['contractDate','custAddress','custName','custTel','custEmail','staff','worksOther','scope','place','dateFrom','dateTo','keyReturn','fee','buy','payDays','searchItems'];
+  var TEXT_FIELDS = ['contractNo','contractDate','custAddress','custName','custTel','custEmail','staff','worksOther','scope','place','dateFrom','dateTo','keyReturn','fee','buy','payDays','searchItems'];
   function buildStatic(){
     $('staff').innerHTML = ''; $('qStaff').innerHTML = '<option value="">すべて</option>';
     state.staffList.forEach(function(n){ var o=document.createElement('option'); o.value=n; o.textContent=n; $('staff').appendChild(o); var o2=o.cloneNode(true); $('qStaff').appendChild(o2); });
@@ -360,7 +360,6 @@ var MOCK = /[?&]mock=1/.test(location.search);                              // �
     WORK_KEYS.forEach(function(k){ var b=document.createElement('button'); b.className='chip'; b.textContent=k; b.dataset.v=k; b.onclick=function(){ toggleWork(k); }; $('works').appendChild(b); });
   }
   function fillForm(c){
-    $('contractNo').value = c.contractNo;
     TEXT_FIELDS.forEach(function(id){ $(id).value = c[id] == null ? '' : c[id]; });
     renderChips();
   }
@@ -368,6 +367,7 @@ var MOCK = /[?&]mock=1/.test(location.search);                              // �
     var c = state.contract;
     TEXT_FIELDS.forEach(function(id){ c[id] = $(id).value; });
     c.custEmail = c.custEmail.trim();
+    c.contractNo = normalizeCaseNo(c.contractNo);
     return c;
   }
   function toggleWork(k){
@@ -400,6 +400,14 @@ var MOCK = /[?&]mock=1/.test(location.search);                              // �
     $('totalWarn').hidden = !(t < 0);
   }
   TEXT_FIELDS.forEach(function(id){ $(id).addEventListener('input', function(){ readForm(); if(id==='fee'||id==='buy') updateTotal(); saveDraft(); }); $(id).addEventListener('change', function(){ readForm(); saveDraft(); }); });
+  $('btnPasteNo').onclick = function(){
+    if(!navigator.clipboard || !navigator.clipboard.readText){ alert('この端末では自動貼り付けができません。契約番号の欄を長押しして「ペースト」してください。'); return; }
+    navigator.clipboard.readText().then(function(t){
+      var no = normalizeCaseNo(t);
+      if(!CASE_NO_RE.test(no)){ alert('コピーした内容「' + String(t).trim().slice(0,30) + '」は案件番号の形（例 26-0152）ではありません。写真アプリで案件番号をコピーし直してください。'); return; }
+      $('contractNo').value = no; readForm(); saveDraft();
+    }).catch(function(){ alert('貼り付けが許可されませんでした。契約番号の欄を長押しして「ペースト」してください。'); });
+  };
   $('btnSamePlace').onclick = function(){ $('place').value = $('custAddress').value; readForm(); saveDraft(); };
   $('btnFormBack').onclick = function(){ readForm(); saveDraft(); goHome(); };
   $('btnToConfirm').onclick = function(){
@@ -544,11 +552,11 @@ var MOCK = /[?&]mock=1/.test(location.search);                              // �
   function mockApi(fn, args){
     var delay = function(v){ return new Promise(function(res){ setTimeout(function(){ res(v); }, 300); }); };
     if(fn === 'login') return delay({ session:'mock', user:{ email:'test@example.com', isAdmin:true }, staffList:['小口（代表）'], template:{ ok:true } });
-    if(fn === 'newContract'){ var d = new Date(); var ymd = d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2)+'-'+('0'+d.getDate()).slice(-2); return delay({ contractNo: contractNo(ymd, 1), contractDate: ymd }); }
+    if(fn === 'newContract'){ var d = new Date(); var ymd = d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2)+'-'+('0'+d.getDate()).slice(-2); return delay({ contractNo: '', contractDate: ymd }); }
     if(fn === 'getTemplateHtml') return delay({ html: MOCK_TEMPLATE });
     if(fn === 'finalize'){ var c = args[0]; var errs = validateContract(c); if(errs.length) return Promise.reject(new Error(errs.join('\n')));
       return delay({ fileName: c.contractNo + '_' + c.contractDate.replace(/-/g,'') + '.pdf', url:'#', folder:'2026年11月 / 90_その他 / 電子契約書', pdfBase64:'', signedAt:'（練習）', warnings:['練習モードのため保存・送信はしていません'] }); }
-    if(fn === 'listContracts') return delay({ isAdmin:true, rows:[{ contractNo:'GOEN-20261101-001', contractDate:'2026-11-01', signedAt:'2026-11-01 14:05', staff:'小口（代表）', custName:'テスト 太郎', works:'遺品整理', total:220000, deliver:'メール', url:'#' }] });
+    if(fn === 'listContracts') return delay({ isAdmin:true, rows:[{ contractNo:'26-0152', contractDate:'2026-11-01', signedAt:'2026-11-01 14:05', staff:'小口（代表）', custName:'テスト 太郎', works:'遺品整理', total:220000, deliver:'メール', url:'#' }] });
     return Promise.reject(new Error('練習モードにない機能: ' + fn));
   }
   var MOCK_TEMPLATE = '<p><b>【控】印刷した本書は電子契約書の控え（写し）です。</b></p><p style="text-align:center;font-weight:bold">作業契約書</p><p style="text-align:right">契約番号：《契約番号》　契約日：《契約日》</p>' +

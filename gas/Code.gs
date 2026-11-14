@@ -94,17 +94,19 @@ function safeCheckTemplate_() {
 }
 function mustProp_(k) { var v = prop_(k); if (!v) throw new Error('GASの初期設定（setupAll）がまだです：' + k); return v; }
 
-// ===== 新規作成：契約番号を発行 =====
+// ===== 新規作成：契約日＝今日。契約番号は写真アプリの案件番号をスタッフが貼る =====
 function newContract(user) {
-  var today = Utilities.formatDate(new Date(), TZ, 'yyyy-MM-dd');
-  var key = 'SEQ_' + today.replace(/-/g, '');
-  var lock = LockService.getScriptLock(); lock.waitLock(10000);
-  var seq;
-  try {
-    seq = (Number(prop_(key)) || 0) + 1;
-    props_().setProperty(key, String(seq));
-  } finally { lock.releaseLock(); }
-  return { contractNo: contractNo(today, seq), contractDate: today };
+  return { contractNo: '', contractDate: Utilities.formatDate(new Date(), TZ, 'yyyy-MM-dd') };
+}
+
+// 同じ契約番号がすでに一覧にあれば止める（再契約は末尾に -2 を付けてもらう）
+function assertCaseNoUnused_(no) {
+  var sh = sheet_();
+  if (sh.getLastRow() < 2) return;
+  var col = sh.getRange(2, 1, sh.getLastRow() - 1, 1).getValues();
+  for (var i = 0; i < col.length; i++) {
+    if (String(col[i][0]).trim() === no) throw new Error('契約番号 ' + no + ' の契約書はすでに締結済みです。同じ案件で作り直す場合は末尾に「-2」を付けてください（例 ' + no.replace(/-\d{1,2}$/, '') + '-2）');
+  }
 }
 
 // ===== 確認画面用：ひな形をHTMLにして返す =====
@@ -126,6 +128,8 @@ function finalize(user, d) {
   var errors = validateContract(d);
   if (errors.length) throw new Error(errors.join('\n'));
   if (STAFF_LIST.indexOf(d.staff) < 0) throw new Error('担当者が一覧にありません：' + d.staff);
+  d.contractNo = normalizeCaseNo(d.contractNo);
+  assertCaseNoUnused_(d.contractNo);
   var tpl = safeCheckTemplate_();
   if (!tpl.ok) throw new Error('契約書のひな形に問題があります（' + (tpl.error || ('不足:' + tpl.missing.join(' ') + ' 不明:' + tpl.unknown.join(' '))) + '）。ひな形を直してから締結してください');
 
@@ -297,7 +301,7 @@ function recreateTemplate() {
 
 // テスト用のPDF（テスト 太郎）を「電子契約書（ひな形・一覧）」フォルダに作る。一覧には書かない・メールも送らない
 function testSamplePdf() {
-  var d = { contractNo: 'GOEN-TEST-001', contractDate: Utilities.formatDate(new Date(), TZ, 'yyyy-MM-dd'),
+  var d = { contractNo: '00-0000', contractDate: Utilities.formatDate(new Date(), TZ, 'yyyy-MM-dd'),
     custAddress: '長野県長野市○○町1-2-3', custName: 'テスト 太郎', custTel: '090-0000-0000', custEmail: 'test@example.com',
     staff: STAFF_LIST[0], works: ['遺品整理', 'その他'], worksOther: '仏壇のご供養', scope: '2階の全部屋。写真と手紙は残す',
     place: '長野県長野市○○町1-2-3', dateFrom: '2026-11-10', dateTo: '2026-11-11', attend: 'あり', keyKeep: 'あり', keyReturn: '2026-11-12',

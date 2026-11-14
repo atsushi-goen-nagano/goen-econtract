@@ -52,10 +52,13 @@ function monthPrefix(s) {
   return p.y + '年' + ('0' + p.m).slice(-2) + '月';
 }
 
-// 契約番号 GOEN-YYYYMMDD-NNN
-function contractNo(s, seq) {
-  var p = parseYmd(s);
-  return 'GOEN-' + p.y + ('0' + p.m).slice(-2) + ('0' + p.d).slice(-2) + '-' + ('00' + seq).slice(-3);
+// 契約番号＝現場写真アプリの案件番号（YY-NNNN、例 26-0152）。再契約のときは末尾に -2 など
+var CASE_NO_RE = /^\d{2}-\d{4}(-\d{1,2})?$/;
+// 全角数字・全角ハイフン・前後の空白をそろえる（iPadで貼り付けたときの揺れ対策）
+function normalizeCaseNo(s) {
+  return String(s == null ? '' : s).trim()
+    .replace(/[０-９]/g, function (ch) { return String.fromCharCode(ch.charCodeAt(0) - 0xFEE0); })
+    .replace(/[‐－―ー−‒–—]/g, '-').replace(/\s+/g, '');
 }
 
 function isInt_(v) { return /^-?\d+$/.test(String(v).trim()); }
@@ -65,7 +68,9 @@ function validateContract(d) {
   d = d || {};
   var e = [];
   var need = function (key, label) { if (!String(d[key] || '').trim()) e.push(label + 'を入力してください'); };
-  need('contractNo', '契約番号');
+  var no = normalizeCaseNo(d.contractNo);
+  if (!no) e.push('契約番号（写真アプリの案件番号）を入力してください');
+  else if (!CASE_NO_RE.test(no)) e.push('契約番号は写真アプリの案件番号の形（例 26-0152）で入力してください');
   if (!parseYmd(d.contractDate)) e.push('契約日を入力してください');
   need('custAddress', 'お客様のご住所');
   need('custName', 'お客様のお名前');
@@ -100,7 +105,7 @@ function buildReplaceMap(d, signedYmd, signedHm) {
   var check = function (on) { return on ? '☑' : '☐'; };
   var signed = wareki(signedYmd) + ' ' + clean(signedHm);
   var m = {
-    '《契約番号》': clean(d.contractNo),
+    '《契約番号》': normalizeCaseNo(d.contractNo),
     '《契約日》': wareki(d.contractDate),
     '《甲住所》': clean(d.custAddress),
     '《甲氏名》': clean(d.custName),
@@ -135,5 +140,5 @@ function buildReplaceMap(d, signedYmd, signedHm) {
 
 // Nodeのテストから読めるようにする（GASではこの行は何もしない）
 if (typeof module !== 'undefined') {
-  module.exports = { COMPANY_TEL: COMPANY_TEL, WORK_KEYS: WORK_KEYS, PLACEHOLDERS: PLACEHOLDERS, parseYmd: parseYmd, wareki: wareki, yen: yen, calcTotal: calcTotal, monthPrefix: monthPrefix, contractNo: contractNo, validateContract: validateContract, buildReplaceMap: buildReplaceMap };
+  module.exports = { COMPANY_TEL: COMPANY_TEL, WORK_KEYS: WORK_KEYS, PLACEHOLDERS: PLACEHOLDERS, parseYmd: parseYmd, wareki: wareki, yen: yen, calcTotal: calcTotal, monthPrefix: monthPrefix, CASE_NO_RE: CASE_NO_RE, normalizeCaseNo: normalizeCaseNo, validateContract: validateContract, buildReplaceMap: buildReplaceMap };
 }
