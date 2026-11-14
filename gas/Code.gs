@@ -155,11 +155,17 @@ function finalize(user, d) {
   try {
     appendRow_([d.contractNo, d.contractDate, Utilities.formatDate(now, TZ, 'yyyy-MM-dd HH:mm:ss'), d.staff, user.email, d.custName,
       (d.works || []).join('・') + (d.works && d.works.indexOf('その他') >= 0 ? '（' + d.worksOther + '）' : ''),
-      Number(d.fee), Number(d.buy), calcTotal(d.fee, d.buy), d.payMethod + (d.payMethod === '振込' ? '(' + d.payDays + '日)' : ''),
+      Number(d.fee), Number(d.buy), calcTotal(d.fee, d.buy), payLabel_(d),
       d.deliver, d.deliver === 'メール' ? d.custEmail : '', file.getUrl(), file.getId(), hash, d.dateFrom + '〜' + d.dateTo, mailResult]);
   } catch (e) { warnings.push('契約一覧への記録ができませんでした（' + e.message + '）。PDFは保存済みです'); }
 
   return { fileName: pdfName, url: file.getUrl(), folder: folderPath_(folder), pdfBase64: Utilities.base64Encode(pdf.getBytes()), sha256: hash, signedAt: signedYmd + ' ' + signedHm, warnings: warnings };
+}
+
+function payLabel_(d) {
+  if (d.payMethod === '振込') return '振込(' + d.payDays + '日)';
+  if (d.payMethod === '2回') return '2回払い(1回目 ' + yen(d.payFirstAmount) + '円 ' + d.payFirstDate + ' ' + d.payFirstHow + '／残金 ' + d.payRestHow + (d.payRestHow === '振込' ? d.payDays + '日' : '') + ')';
+  return String(d.payMethod);
 }
 
 function sigBlob_(dataUrl, label) {

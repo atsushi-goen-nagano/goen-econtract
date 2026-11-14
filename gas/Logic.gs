@@ -4,7 +4,8 @@
 var COMPANY_TEL = '026-405-8085';
 
 var WORK_KEYS = ['遺品整理', '生前整理', '特殊清掃', '消臭・除菌', '空き家片付け', 'その他'];
-var PAY_KEYS = { '現金': '支払現金', '振込': '支払振込' };
+var PAY_KEYS = { '現金': '支払現金', '振込': '支払振込', '2回': '支払2回' };
+var HOW_KEYS = ['現金', '振込'];
 var DELIVER_KEYS = { 'LINE': '受取LINE', 'メール': '受取メール', '紙': '受取紙' };
 
 // ひな形ドキュメントに書く「差し込みの印」の一覧。ひな形の点検（checkTemplate）もこれを使う。
@@ -12,10 +13,11 @@ var PLACEHOLDERS = [
   '《契約番号》', '《契約日》',
   '《甲住所》', '《甲氏名》', '《甲電話》', '《甲メール》', '《乙電話》', '《乙担当者》',
   '《その他内容》', '《作業範囲》', '《作業場所》', '《作業開始日》', '《作業終了日》', '《鍵返却日》',
-  '《作業費》', '《買取額》', '《合計》', '《振込期限日数》', '《探してほしい品物》', '《承諾メール》',
+  '《作業費》', '《買取額》', '《合計》', '《振込期限日数》',
+  '《分割1回目金額》', '《分割1回目日》', '《分割1回目方法》', '《分割残金》', '《分割残金方法》', '《探してほしい品物》', '《承諾メール》',
   '《甲署名日》', '《乙署名日》',
   '《チェック:立会あり》', '《チェック:立会なし》', '《チェック:鍵あり》', '《チェック:鍵なし》',
-  '《チェック:支払現金》', '《チェック:支払振込》',
+  '《チェック:支払現金》', '《チェック:支払振込》', '《チェック:支払2回》',
   '《チェック:受取LINE》', '《チェック:受取メール》', '《チェック:受取紙》'
 ].concat(WORK_KEYS.map(function (k) { return '《チェック:' + k + '》'; }));
 
@@ -91,7 +93,16 @@ function validateContract(d) {
   if (!isInt_(d.fee) || Number(d.fee) < 0) e.push('作業費を数字で入力してください');
   if (!isInt_(d.buy) || Number(d.buy) < 0) e.push('買取額を数字で入力してください（なければ0）');
   if (!PAY_KEYS[d.payMethod]) e.push('お支払い方法を選んでください');
-  if (d.payMethod === '振込' && !(isInt_(d.payDays) && Number(d.payDays) > 0)) e.push('振込の期限（日数）を入力してください');
+  var needDays = d.payMethod === '振込' || (d.payMethod === '2回' && d.payRestHow === '振込');
+  if (needDays && !(isInt_(d.payDays) && Number(d.payDays) > 0)) e.push('振込の期限（日数）を入力してください');
+  if (d.payMethod === '2回') {
+    var total = calcTotal(d.fee, d.buy), first = isInt_(d.payFirstAmount) ? Number(d.payFirstAmount) : -1;
+    if (first <= 0) e.push('2回払いの1回目の金額を数字で入力してください');
+    else if (first >= total) e.push('1回目の金額は合計お支払い額より少なくしてください');
+    if (!parseYmd(d.payFirstDate)) e.push('1回目のお支払い期日を入力してください');
+    if (HOW_KEYS.indexOf(d.payFirstHow) < 0) e.push('1回目のお支払い方法（現金／振込）を選んでください');
+    if (HOW_KEYS.indexOf(d.payRestHow) < 0) e.push('残金のお支払い方法（現金／振込）を選んでください');
+  }
   if (!DELIVER_KEYS[d.deliver]) e.push('控えの受け取り方法を選んでください');
   if (d.deliver === 'メール' && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(d.custEmail || '').trim())) e.push('メールで送るにはお客様のメールアドレスが必要です');
   return e;
@@ -122,7 +133,12 @@ function buildReplaceMap(d, signedYmd, signedHm) {
     '《作業費》': yen(d.fee),
     '《買取額》': yen(d.buy),
     '《合計》': yen(calcTotal(d.fee, d.buy)),
-    '《振込期限日数》': d.payMethod === '振込' ? clean(d.payDays) : '—',
+    '《振込期限日数》': (d.payMethod === '振込' || (d.payMethod === '2回' && d.payRestHow === '振込')) ? clean(d.payDays) : '—',
+    '《分割1回目金額》': d.payMethod === '2回' ? yen(d.payFirstAmount) : '—',
+    '《分割1回目日》': d.payMethod === '2回' ? wareki(d.payFirstDate) : '—',
+    '《分割1回目方法》': d.payMethod === '2回' ? (d.payFirstHow === '振込' ? '銀行振込（振込手数料は甲の負担）' : '現金') : '—',
+    '《分割残金》': d.payMethod === '2回' ? yen(calcTotal(d.fee, d.buy) - (Number(d.payFirstAmount) || 0)) : '—',
+    '《分割残金方法》': d.payMethod === '2回' ? (d.payRestHow === '振込' ? '銀行振込（作業完了日から' + clean(d.payDays) + '日以内。振込手数料は甲の負担）' : '現金（作業完了時）') : '—',
     '《探してほしい品物》': or(d.searchItems),
     '《承諾メール》': d.deliver === 'メール' ? clean(d.custEmail) : '—',
     '《甲署名日》': signed,
@@ -140,5 +156,5 @@ function buildReplaceMap(d, signedYmd, signedHm) {
 
 // Nodeのテストから読めるようにする（GASではこの行は何もしない）
 if (typeof module !== 'undefined') {
-  module.exports = { COMPANY_TEL: COMPANY_TEL, WORK_KEYS: WORK_KEYS, PLACEHOLDERS: PLACEHOLDERS, parseYmd: parseYmd, wareki: wareki, yen: yen, calcTotal: calcTotal, monthPrefix: monthPrefix, CASE_NO_RE: CASE_NO_RE, normalizeCaseNo: normalizeCaseNo, validateContract: validateContract, buildReplaceMap: buildReplaceMap };
+  module.exports = { COMPANY_TEL: COMPANY_TEL, WORK_KEYS: WORK_KEYS, HOW_KEYS: HOW_KEYS, PLACEHOLDERS: PLACEHOLDERS, parseYmd: parseYmd, wareki: wareki, yen: yen, calcTotal: calcTotal, monthPrefix: monthPrefix, CASE_NO_RE: CASE_NO_RE, normalizeCaseNo: normalizeCaseNo, validateContract: validateContract, buildReplaceMap: buildReplaceMap };
 }

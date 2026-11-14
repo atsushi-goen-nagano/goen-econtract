@@ -146,7 +146,17 @@
       <div class="hint" id="totalWarn" hidden style="color:var(--red)">合計がマイナスです。金額を確認してください。</div>
 
       <label class="f">お支払い方法<span class="req">必須</span></label>
-      <div class="chips" data-group="payMethod"><button class="chip" data-v="現金">現金</button><button class="chip" data-v="振込">銀行振込</button></div>
+      <div class="chips" data-group="payMethod"><button class="chip" data-v="現金">現金</button><button class="chip" data-v="振込">銀行振込</button><button class="chip" data-v="2回">2回払い（1回目＋残金）</button></div>
+      <div id="splitWrap" hidden>
+        <div class="row">
+          <div><label class="f">1回目の金額（円）<span class="req">必須</span></label><input type="number" id="payFirstAmount" inputmode="numeric" placeholder="例：10000"></div>
+          <div><label class="f">1回目の期日<span class="req">必須</span></label><input type="date" id="payFirstDate"></div>
+        </div>
+        <label class="f">1回目の方法<span class="req">必須</span></label>
+        <div class="chips" data-group="payFirstHow"><button class="chip" data-v="現金">現金</button><button class="chip" data-v="振込">銀行振込</button></div>
+        <label class="f">残金 <span id="restAmount" class="pill">—</span> の方法（作業完了時）<span class="req">必須</span></label>
+        <div class="chips" data-group="payRestHow"><button class="chip" data-v="現金">現金</button><button class="chip" data-v="振込">銀行振込</button></div>
+      </div>
       <div id="payDaysWrap" hidden><label class="f">振込の期限（作業完了日から何日以内）<span class="req">必須</span></label><input type="number" id="payDays" inputmode="numeric" value="7"></div>
 
       <label class="f">探してほしい品物 <small>（任意）</small></label>
@@ -348,11 +358,11 @@ var MOCK = /[?&]mock=1/.test(location.search);                              // �
   function clearDraft(){ try{ localStorage.removeItem('ec_draft'); }catch(_){} }
   function emptyContract(no, date){
     return { contractNo:no, contractDate:date, custAddress:'', custName:'', custTel:'', custEmail:'', staff: state.staffList[0] || '',
-      works:[], worksOther:'', scope:'', place:'', dateFrom:'', dateTo:'', attend:'', keyKeep:'', keyReturn:'', fee:'', buy:'0', payMethod:'', payDays:'7', searchItems:'', deliver:'' };
+      works:[], worksOther:'', scope:'', place:'', dateFrom:'', dateTo:'', attend:'', keyKeep:'', keyReturn:'', fee:'', buy:'0', payMethod:'', payDays:'7', payFirstAmount:'', payFirstDate:'', payFirstHow:'', payRestHow:'', searchItems:'', deliver:'' };
   }
 
   // ---- 入力画面 ----
-  var TEXT_FIELDS = ['contractNo','contractDate','custAddress','custName','custTel','custEmail','staff','worksOther','scope','place','dateFrom','dateTo','keyReturn','fee','buy','payDays','searchItems'];
+  var TEXT_FIELDS = ['contractNo','contractDate','custAddress','custName','custTel','custEmail','staff','worksOther','scope','place','dateFrom','dateTo','keyReturn','fee','buy','payDays','payFirstAmount','payFirstDate','searchItems'];
   function buildStatic(){
     $('staff').innerHTML = ''; $('qStaff').innerHTML = '<option value="">すべて</option>';
     state.staffList.forEach(function(n){ var o=document.createElement('option'); o.value=n; o.textContent=n; $('staff').appendChild(o); var o2=o.cloneNode(true); $('qStaff').appendChild(o2); });
@@ -384,7 +394,8 @@ var MOCK = /[?&]mock=1/.test(location.search);                              // �
       Array.prototype.forEach.call(g.children, function(b){ b.classList.toggle('on', c[key] === b.dataset.v); });
     });
     $('keyReturnWrap').hidden = c.keyKeep !== 'あり';
-    $('payDaysWrap').hidden = c.payMethod !== '振込';
+    $('splitWrap').hidden = c.payMethod !== '2回';
+    $('payDaysWrap').hidden = !(c.payMethod === '振込' || (c.payMethod === '2回' && c.payRestHow === '振込'));
     $('deliverEmailWrap').hidden = c.deliver !== 'メール';
     updateTotal();
   }
@@ -398,8 +409,10 @@ var MOCK = /[?&]mock=1/.test(location.search);                              // �
     $('total').textContent = yen(t) + ' 円';
     $('total').classList.toggle('neg', t < 0);
     $('totalWarn').hidden = !(t < 0);
+    var first = Number($('payFirstAmount').value) || 0;
+    $('restAmount').textContent = first ? yen(t - first) + ' 円' : '—';
   }
-  TEXT_FIELDS.forEach(function(id){ $(id).addEventListener('input', function(){ readForm(); if(id==='fee'||id==='buy') updateTotal(); saveDraft(); }); $(id).addEventListener('change', function(){ readForm(); saveDraft(); }); });
+  TEXT_FIELDS.forEach(function(id){ $(id).addEventListener('input', function(){ readForm(); if(id==='fee'||id==='buy'||id==='payFirstAmount') updateTotal(); saveDraft(); }); $(id).addEventListener('change', function(){ readForm(); saveDraft(); }); });
   $('btnPasteNo').onclick = function(){
     if(!navigator.clipboard || !navigator.clipboard.readText){ alert('この端末では自動貼り付けができません。契約番号の欄を長押しして「ペースト」してください。'); return; }
     navigator.clipboard.readText().then(function(t){
@@ -563,7 +576,7 @@ var MOCK = /[?&]mock=1/.test(location.search);                              // �
     '<table><tr><td>甲 ご住所</td><td>《甲住所》</td></tr><tr><td>甲 お名前</td><td>《甲氏名》</td></tr><tr><td>乙 担当者</td><td>《乙担当者》</td></tr></table>' +
     '<p>《チェック:遺品整理》遺品整理　《チェック:生前整理》生前整理　《チェック:その他》その他（《その他内容》）</p><p>作業の範囲：《作業範囲》</p>' +
     '<table><tr><td>作業費</td><td>《作業費》 円</td></tr><tr><td>買取額</td><td>− 《買取額》 円</td></tr><tr><td><b>合計</b></td><td><b>《合計》 円</b></td></tr></table>' +
-    '<p>《チェック:支払現金》現金　《チェック:支払振込》銀行振込（《振込期限日数》日以内）</p>' +
+    '<p>《チェック:支払現金》現金　《チェック:支払振込》銀行振込（《振込期限日数》日以内）　《チェック:支払2回》2回払い：1回目《分割1回目金額》円を《分割1回目日》までに《分割1回目方法》、残金《分割残金》円を《分割残金方法》</p>' +
     '<p>' + new Array(30).join('この契約に定めのないことや、解釈に迷うことがあるときは、甲乙が誠意をもって話し合って決めます。') + '</p>' +
     '<table><tr><td style="border:2px solid #cc0000;color:#cc0000"><b>クーリングオフのお知らせ</b><br>この契約が特定商取引法の訪問販売にあたる場合、8日以内であれば無条件で契約を解除できます。</td></tr></table>' +
     '<p>《チェック:受取LINE》LINE　《チェック:受取メール》電子メール（《承諾メール》）　《チェック:受取紙》紙</p>' +

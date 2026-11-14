@@ -81,6 +81,27 @@ test('replace map', () => {
   L.PLACEHOLDERS.forEach(k => assert.ok(k in m, 'missing ' + k));
   Object.keys(m).forEach(k => assert.ok(L.PLACEHOLDERS.includes(k), 'extra ' + k));
 });
+test('split payment', () => {
+  const d = Object.assign(base(), { payMethod: '2回', payFirstAmount: 10000, payFirstDate: '2026-11-16', payFirstHow: '現金', payRestHow: '現金', payDays: '' });
+  assert.deepStrictEqual(L.validateContract(d), []);
+  const m = L.buildReplaceMap(d, '2026-11-14', '10:00');
+  assert.strictEqual(m['《チェック:支払2回》'], '☑');
+  assert.strictEqual(m['《チェック:支払現金》'], '☐');
+  assert.strictEqual(m['《分割1回目金額》'], '10,000');
+  assert.strictEqual(m['《分割1回目日》'], '令和8年11月16日');
+  assert.strictEqual(m['《分割1回目方法》'], '現金');
+  assert.strictEqual(m['《分割残金》'], '210,000');
+  assert.strictEqual(m['《分割残金方法》'], '現金（作業完了時）');
+  assert.strictEqual(m['《振込期限日数》'], '—');
+  const v = Object.assign({}, d, { payRestHow: '振込', payDays: 7 });
+  assert.strictEqual(L.buildReplaceMap(v, '2026-11-14', '10:00')['《分割残金方法》'], '銀行振込（作業完了日から7日以内。振込手数料は甲の負担）');
+  assert.ok(L.validateContract(Object.assign({}, v, { payDays: '' })).some(x => x.includes('期限')));
+  assert.ok(L.validateContract(Object.assign({}, d, { payFirstAmount: 220000 })).some(x => x.includes('少なく')));
+  assert.ok(L.validateContract(Object.assign({}, d, { payFirstDate: '' })).some(x => x.includes('期日')));
+  assert.ok(L.validateContract(Object.assign({}, d, { payFirstHow: '' })).some(x => x.includes('1回目のお支払い方法')));
+  const one = L.buildReplaceMap(base(), '2026-11-14', '10:00');
+  assert.strictEqual(one['《分割残金》'], '—');
+});
 test('replace map sanitizes', () => {
   const d = base(); d.scope = 'a$b'; d.keyKeep = 'なし'; d.keyReturn = '2026-11-07'; d.payMethod = '現金';
   const m = L.buildReplaceMap(d, '2026-11-01', '09:00');
