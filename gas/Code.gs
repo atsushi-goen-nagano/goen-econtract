@@ -284,6 +284,9 @@ function setupAll() {
   props_().setProperty('CONFIG_FOLDER_ID', cfg.id);
   var tplId = prop_('TEMPLATE_DOC_ID');
   if (!tplId) {
+    // 前回途中で失敗して残った作りかけのひな形（マイドライブ直下）はゴミ箱へ
+    var stray = DriveApp.getRootFolder().getFilesByName(TEMPLATE_DOC_NAME);
+    while (stray.hasNext()) stray.next().setTrashed(true);
     tplId = createTemplateDoc_(DriveApp.getFolderById(cfg.id));
     props_().setProperty('TEMPLATE_DOC_ID', tplId);
   }

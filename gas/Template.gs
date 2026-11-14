@@ -110,7 +110,8 @@ function createTemplateDoc_(folder) {
   // 全ページ下部の控え文言（フッター・8pt）
   var footer = doc.addFooter();
   var fp = footer.getParagraphs()[0] || footer.appendParagraph('');
-  fp.setText(COPY_NOTICE).setAlignment(DocumentApp.HorizontalAlignment.CENTER);
+  fp.setText(COPY_NOTICE);
+  fp.setAlignment(DocumentApp.HorizontalAlignment.CENTER);
   fp.editAsText().setFontSize(8);
 
   var first = true;
@@ -163,7 +164,7 @@ function createTemplateDoc_(folder) {
         sc.setPaddingTop(6).setPaddingBottom(6).setPaddingLeft(5).setPaddingRight(5);
         sc.editAsText().setFontSize(9).setBold(rr === 0 || cc === 0);
         if (rr === 0 || cc === 0) sc.setBackgroundColor('#f1f1f1');
-        if (rr > 0 && cc === 1) sc.setMinimumHeight(70);
+        if (rr > 0 && cc === 1) st.getRow(rr).setMinimumHeight(70);
       }
     }
   });
