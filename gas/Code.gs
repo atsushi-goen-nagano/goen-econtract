@@ -316,6 +316,8 @@ function checkMailAlias() {
 
 // ひな形を作り直したいとき（既存のひな形は残る。新しいIDに切り替わる）
 function recreateTemplate() {
+  var old = prop_('TEMPLATE_DOC_ID');
+  if (old) { try { DriveApp.getFileById(old).setName(TEMPLATE_DOC_NAME + '（旧 ' + Utilities.formatDate(new Date(), TZ, 'yyyy-MM-dd HHmm') + '）'); } catch (e) {} }
   props_().deleteProperty('TEMPLATE_DOC_ID');
   CacheService.getScriptCache().removeAll(['x']);
   setupAll();

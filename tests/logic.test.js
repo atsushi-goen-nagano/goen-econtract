@@ -65,7 +65,8 @@ test('replace map', () => {
   assert.strictEqual(m['《作業費》'], '250,000');
   assert.strictEqual(m['《合計》'], '220,000');
   assert.strictEqual(m['《チェック:遺品整理》'], '☑');
-  assert.strictEqual(m['《チェック:生前整理》'], '☐');
+  assert.strictEqual(m['《チェック:家財整理》'], '☐');
+  assert.strictEqual(m['《チェック:ゴミ屋敷清掃》'], '☐');
   assert.strictEqual(m['《チェック:その他》'], '☑');
   assert.strictEqual(m['《チェック:立会あり》'], '☑');
   assert.strictEqual(m['《チェック:鍵なし》'], '☐');
