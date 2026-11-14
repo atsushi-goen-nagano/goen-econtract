@@ -265,7 +265,20 @@ function moveToFolder_(fileId, folderId) {
 }
 
 // ===== 初回セットアップ（GASエディタで本人が実行）=====
+// 0) setupProps：スクリプト プロパティの初期値（空のときだけ入れる。クライアントIDは秘密ではない）
+var INIT_PROPS = {
+  OAUTH_CLIENT_ID: '1018313183986-0govtqeenqmlgcbb17sg2jrd3kfhvuhf.apps.googleusercontent.com',
+  ALLOWED_EMAILS: 'goen3378@gmail.com',
+  ADMIN_EMAILS: 'goen3378@gmail.com'
+};
+function setupProps() {
+  Object.keys(INIT_PROPS).forEach(function (k) { if (!prop_(k)) props_().setProperty(k, INIT_PROPS[k]); });
+  Logger.log('設定済み: ' + JSON.stringify(props_().getProperties(), null, 1));
+}
+
+// 1) setupAll：共有ドライブ・ひな形Doc・契約一覧を用意
 function setupAll() {
+  setupProps();
   var driveId = getSharedDriveId_();
   var cfg = findOrCreateFolder_(driveId, function (n) { return n === CONFIG_FOLDER_NAME; }, CONFIG_FOLDER_NAME);
   props_().setProperty('CONFIG_FOLDER_ID', cfg.id);
