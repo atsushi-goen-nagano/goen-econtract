@@ -164,7 +164,7 @@ function finalize(user, d) {
 
 function payLabel_(d) {
   if (d.payMethod === '振込') return '振込(' + d.payDays + '日)';
-  if (d.payMethod === '2回') return '2回払い(1回目 ' + yen(d.payFirstAmount) + '円 ' + d.payFirstDate + ' ' + d.payFirstHow + '／残金 ' + d.payRestHow + (d.payRestHow === '振込' ? d.payDays + '日' : '') + ')';
+  if (d.payMethod === '2回') return '2回払い(1回目 ' + yen(d.payFirstAmount) + '円 ' + d.payFirstDate + ' ' + d.payFirstHow + '／残金 ' + d.payRestDate + ' ' + d.payRestHow + ')';
   return String(d.payMethod);
 }
 
