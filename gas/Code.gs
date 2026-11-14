@@ -115,7 +115,10 @@ function getTemplateHtml(user) {
   var cache = CacheService.getScriptCache();
   var hit = cache.get('TEMPLATE_HTML_' + id);
   if (hit) return { html: hit };
-  var html = DriveApp.getFileById(id).getAs('text/html').getDataAsString();
+  var res = UrlFetchApp.fetch('https://www.googleapis.com/drive/v3/files/' + id + '/export?mimeType=text%2Fhtml&supportsAllDrives=true',
+    { headers: { Authorization: 'Bearer ' + ScriptApp.getOAuthToken() }, muteHttpExceptions: true });
+  if (res.getResponseCode() !== 200) throw new Error('ひな形を読み込めませんでした（' + res.getResponseCode() + '）');
+  var html = res.getContentText('UTF-8');
   var m = /<body[^>]*>([\s\S]*)<\/body>/i.exec(html);
   html = m ? m[1] : html;
   try { cache.put('TEMPLATE_HTML_' + id, html, 600); } catch (e) {}
