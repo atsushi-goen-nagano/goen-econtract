@@ -152,7 +152,7 @@ var MOCK = /[?&]mock=1/.test(location.search);
   if(!token && !MOCK){ fail('リンクが正しくありません。お送りしたリンクをそのまま開いてください。'); }
   else {
     api('remoteGet', [token, navigator.userAgent]).then(function(r){
-      state.d = r.d; state.html = r.html; state.company = r.company || { tel:'026-405-8085' };
+      state.d = r.d; state.html = r.html; state.company = r.company || { tel:'0800-123-4150' };
       var d = r.d;
       $('introName').textContent = d.custName; $('introStaff').textContent = r.staff || d.staff; $('introNo').textContent = d.contractNo;
       $('introDate').textContent = wareki(d.dateFrom) + ' 〜 ' + wareki(d.dateTo);
@@ -247,7 +247,7 @@ var MOCK = /[?&]mock=1/.test(location.search);
   function mockApi(fn, args){
     var delay = function(v){ return new Promise(function(r){ setTimeout(function(){ r(v); }, 300); }); };
     if(fn === 'remoteGet') return delay({ d:{ contractNo:'26-0152', contractDate:'2026-11-15', custAddress:'長野市○○1-2-3', custName:'テスト 太郎', custTel:'090-0000-0000', custEmail:'', staff:'小口（代表）', works:['遺品整理'], worksOther:'', scope:'2階の全部屋', place:'長野市○○1-2-3', dateFrom:'2026-11-20', dateTo:'2026-11-21', attend:'なし', keyKeep:'あり', keyReturn:'2026-11-22', fee:230000, buy:0, payMethod:'2回', payDays:'', payFirstAmount:10000, payFirstDate:'2026-11-16', payFirstHow:'現金', payRestDate:'2026-12-10', payRestHow:'振込', searchItems:'通帳' },
-      exp: Date.now()+6*86400000, status:'開封済', staff:'小口（代表）', company:{ tel:'026-405-8085' },
+      exp: Date.now()+6*86400000, status:'開封済', staff:'小口（代表）', company:{ tel:'0800-123-4150' },
       html:'<p><b>【控】印刷した本書は電子契約書の控え（写し）です。</b></p><p style="text-align:center"><b>作業契約書</b></p><p>契約番号：《契約番号》　契約日：《契約日》</p><table><tr><td>甲</td><td>《甲氏名》</td></tr><tr><td>合計</td><td>《合計》 円</td></tr></table><p>《チェック:支払2回》2回払い：1回目《分割1回目金額》円を《分割1回目日》までに《分割1回目方法》、残金《分割残金》円を《分割残金日》までに《分割残金方法》</p><p>' + new Array(25).join('この契約に定めのないことは甲乙が誠意をもって話し合って決めます。') + '</p><p>《チェック:受取LINE》LINE　《チェック:受取メール》メール（《承諾メール》）　《チェック:受取紙》紙</p><table><tr><td>甲</td><td>《署名_甲》</td><td>《甲署名日》</td></tr><tr><td>乙</td><td>《署名_乙》</td><td>《乙署名日》</td></tr></table>' });
     if(fn === 'remoteSign') return delay({ fileName:'26-0152_20261115.pdf', pdfBase64:'', signedAt:'（練習）', deliver: args[2], mailed: args[2] === 'メール' });
     return Promise.reject(new Error('練習モードにない機能'));

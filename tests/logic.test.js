@@ -100,7 +100,7 @@ test('replace map', () => {
   assert.strictEqual(m['《振込期限日数》'], '7');
   assert.strictEqual(m['《鍵返却日》'], '令和8年11月7日');
   assert.strictEqual(m['《甲署名日》'], '令和8年11月1日 14:05');
-  assert.strictEqual(m['《乙電話》'], '026-405-8085');
+  assert.strictEqual(m['《乙電話》'], '0800-123-4150');
   // every placeholder defined is present in the map
   L.PLACEHOLDERS.forEach(k => assert.ok(k in m, 'missing ' + k));
   Object.keys(m).forEach(k => assert.ok(L.PLACEHOLDERS.includes(k), 'extra ' + k));

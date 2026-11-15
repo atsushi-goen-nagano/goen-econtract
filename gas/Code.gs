@@ -9,7 +9,8 @@
 //   以下は setupAll が自動で入れる: SHARED_DRIVE_ID / CONFIG_FOLDER_ID / TEMPLATE_DOC_ID / SHEET_ID
 
 var TZ = 'Asia/Tokyo';
-var COMPANY = { name: '株式会社GOEN', tel: COMPANY_TEL, email: 'info@goen-nagano.com', address: '〒381-2203 長野県長野市真島町川合777-1' };
+// 電話番号は Logic.gs の COMPANY_TEL が正本（ファイルの読み込み順の都合で、ここでは直接書かず関数で参照）
+var COMPANY = { name: '株式会社GOEN', get tel() { return COMPANY_TEL; }, email: 'info@goen-nagano.com', address: '〒381-2203 長野県長野市真島町川合777-1' };
 var STAFF_LIST = ['小口（代表）'];            // 署名画面で選ぶ担当者。増やすときはここに追加
 var SHARED_DRIVE_NAME_HINT = '小口社長';       // この文字を含む共有ドライブを使う
 var MONTH_SUB_PREFIX = '90_';                 // 月フォルダの中の「90_その他」
