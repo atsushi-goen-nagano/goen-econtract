@@ -16,6 +16,10 @@ iPadでお客様に指で署名してもらう作業契約書。署名済みPDF�
 - ひな形Doc: https://docs.google.com/document/d/1VxPGvTi4KFc2bJ95SzO8x5Rw24OJ8CcnOeZefN_g6Wk/edit （2026-11-15 recreateTemplate で作り直し。旧版は「（旧 …）」名で同フォルダ）
 - 契約一覧: https://docs.google.com/spreadsheets/d/1_mPZILoFXcbBu0NjeTL3jFMm-8nNUtPpQzsZk0SWYsc/edit
 
+## 写真アプリ連携（2026-11-15）
+- 契約番号（案件番号）→ 写真アプリ `GET /api/external/cases/:case_no`（ヘッダ `x-econtract-key`）で お客様名・電話・現場住所・種類 を取得し空欄に入れる
+- 合言葉は VPS `/srv/genba-photo/econtract.key`（写真アプリが初回起動時に生成）→ GAS スクリプト プロパティ `GENBA_API_KEY`。表示は 現場写真アプリ/電子契約書の鍵を表示.command
+
 ## 直すときの約束
 - `gas/Logic.gs` を直したら `cp gas/Logic.gs docs/logic.js`（画面も同じ計算を使う）
 - 画面（docs/）は `git push` で公開に反映

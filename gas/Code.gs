@@ -25,6 +25,7 @@ var REMOTE_DAYS = 7;                                   // 遠隔署名リンク�
 var REMOTE_PENDING_FOLDER = '遠隔署名（待ち）';
 var REMOTE_DONE_FOLDER = '遠隔署名（記録）';
 var DRAFT_FOLDER = '下書き';
+var GENBA_API_BASE = 'https://genba.okataduke-goen.com'; // 現場写真アプリ（案件番号→お客様名・電話・現場住所）。合言葉はスクリプト プロパティ GENBA_API_KEY
 var SIGN_PAGE_URL = 'https://atsushi-goen-nagano.github.io/goen-econtract/sign.html';
 
 var SHEET_HEADER = ['契約番号', '契約日', '締結日時', '担当者', '作成者', 'お客様名', '作業内容', '作業費', '買取額', '合計', '支払方法', '送付方法', '送付先', 'PDFリンク', 'ファイルID', 'SHA-256', '作業予定日', 'メール送信', '署名方法', '遠隔記録'];
@@ -42,7 +43,7 @@ function doGet() {
 
 var API_FUNCS = { newContract: newContract, getTemplateHtml: getTemplateHtml, finalize: finalize, listContracts: listContracts, whoami: whoami,
   createRemote: createRemote, listRemote: listRemote, cancelRemote: cancelRemote, remoteSendLink: remoteSendLink,
-  saveDraft: saveDraft, listDrafts: listDrafts, getDraft: getDraft, deleteDraft: deleteDraft };
+  saveDraft: saveDraft, listDrafts: listDrafts, getDraft: getDraft, deleteDraft: deleteDraft, lookupCase: lookupCase };
 // お客様側（ログインなし・リンクの合言葉だけで呼べる）
 var PUBLIC_FUNCS = { remoteGet: remoteGet, remoteSign: remoteSign };
 
@@ -186,6 +187,32 @@ function finalizeCore_(d, sigC, sigS, meta) {
   } catch (e) { warnings.push('契約一覧への記録ができませんでした（' + e.message + '）。PDFは保存済みです'); }
 
   return { fileName: pdfName, url: file.getUrl(), folder: folderPath_(folder), pdfBase64: Utilities.base64Encode(pdf.getBytes()), sha256: hash, signedAt: signedYmd + ' ' + signedHm, warnings: warnings };
+}
+
+// ===== 現場写真アプリから案件情報を読む（契約番号＝案件番号）=====
+function lookupCase(user, caseNo) {
+  var no = normalizeCaseNo(caseNo);
+  var m = /^(\d{2}-\d{4})(-\d{1,2})?$/.exec(no);
+  if (!m) throw new Error('契約番号は写真アプリの案件番号の形（例 26-0152）で入力してください');
+  no = m[1]; // 26-0152-2（再契約）→ 26-0152 で照会
+  var key = prop_('GENBA_API_KEY');
+  if (!key) throw new Error('写真アプリとの合言葉（GENBA_API_KEY）が未設定です。「電子契約書の鍵を表示.command」で表示される文字列をスクリプト プロパティに入れてください');
+  var res = UrlFetchApp.fetch(GENBA_API_BASE + '/api/external/cases/' + encodeURIComponent(no), { headers: { 'x-econtract-key': key }, muteHttpExceptions: true });
+  var code = res.getResponseCode(), body = {};
+  try { body = JSON.parse(res.getContentText()); } catch (e) {}
+  if (code === 403) throw new Error('写真アプリが合言葉を受け付けませんでした（GENBA_API_KEY を確認）');
+  if (code !== 200) throw new Error(body.error || ('写真アプリに接続できませんでした（' + code + '）'));
+  var tel = formatTel_(String(body.client_tel || ''));
+  return { caseNo: no, caseName: body.name || '', custName: body.client_name || '', custTel: tel, place: body.site_address || '', city: body.city || '', type: body.type || '', workDate: body.work_date || '', archived: !!body.archived };
+}
+
+// 数字だけの電話番号を読みやすく（090-1234-5678 / 0120-123-456 / 0800-123-4150 / 026-123-4567）
+function formatTel_(d) {
+  if (!/^0\d{9,10}$/.test(d)) return d;
+  if (/^(0120|0800)/.test(d)) return d.length === 11 ? d.replace(/^(\d{4})(\d{3})(\d{4})$/, '$1-$2-$3') : d.replace(/^(\d{4})(\d{3})(\d{3})$/, '$1-$2-$3');
+  if (d.length === 11) return d.replace(/^(\d{3})(\d{4})(\d{4})$/, '$1-$2-$3');
+  if (/^0[36]/.test(d)) return d.replace(/^(\d{2})(\d{4})(\d{4})$/, '$1-$2-$3');
+  return d.replace(/^(\d{3})(\d{3})(\d{4})$/, '$1-$2-$3');
 }
 
 // ===== 下書き（どの端末からでも再開できるよう裏方にも保存）=====

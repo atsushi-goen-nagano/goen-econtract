@@ -116,7 +116,7 @@
     <div class="card">
       <h2>1. 入力 <span class="hint" style="display:inline">（スタッフが入力）</span></h2>
       <div class="row">
-        <div><label class="f">契約番号 <small>（写真アプリの案件番号）</small><span class="req">必須</span></label><input type="text" id="contractNo" placeholder="例：26-0152" autocomplete="off" inputmode="numeric"><button class="btn sec" id="btnPasteNo" style="min-height:48px;font-size:16px;margin-top:8px">コピーした案件番号を貼り付け</button></div>
+        <div><label class="f">契約番号 <small>（写真アプリの案件番号）</small><span class="req">必須</span></label><input type="text" id="contractNo" placeholder="例：26-0152" autocomplete="off" inputmode="numeric"><div class="row"><button class="btn sec" id="btnPasteNo" style="min-height:48px;font-size:16px;margin-top:8px">コピーした案件番号を貼り付け</button><button class="btn sec" id="btnLookup" style="min-height:48px;font-size:16px;margin-top:8px">写真アプリから読み込む</button></div><div id="lookupInfo" class="hint" hidden></div></div>
         <div><label class="f">契約日<span class="req">必須</span></label><input type="date" id="contractDate"></div>
       </div>
 
@@ -520,9 +520,27 @@ var MOCK = /[?&]mock=1/.test(location.search);                              // �
     navigator.clipboard.readText().then(function(t){
       var no = normalizeCaseNo(t);
       if(!CASE_NO_RE.test(no)){ alert('コピーした内容「' + String(t).trim().slice(0,30) + '」は案件番号の形（例 26-0152）ではありません。写真アプリで案件番号をコピーし直してください。'); return; }
-      $('contractNo').value = no; readForm(); saveDraft();
+      $('contractNo').value = no; readForm(); saveDraft(); lookupCase(no, false);
     }).catch(function(){ alert('貼り付けが許可されませんでした。契約番号の欄を長押しして「ペースト」してください。'); });
   };
+  // 写真アプリから お客様名・電話・現場住所・作業内容 を読み込む（空欄だけ埋める。manual=true のときは上書き確認）
+  function lookupCase(no, manual){
+    no = normalizeCaseNo(no || $('contractNo').value);
+    if(!CASE_NO_RE.test(no)){ if(manual) alert('契約番号を 26-0152 の形で入れてから押してください'); return; }
+    $('lookupInfo').hidden = false; $('lookupInfo').textContent = '写真アプリから読み込んでいます…';
+    api('lookupCase', [no]).then(function(r){
+      var c = state.contract, filled = [];
+      var put = function(key, elId, val, label){ if(!val) return; if(c[key] && c[key] !== val){ if(!manual || !confirm(label + 'がすでに入っています（' + c[key] + '）。写真アプリの「' + val + '」で上書きしますか？')) return; } c[key] = val; $(elId).value = val; filled.push(label); };
+      put('custName', 'custName', r.custName, 'お名前');
+      put('custTel', 'custTel', r.custTel, '電話番号');
+      put('place', 'place', r.place || (r.city ? r.city : ''), '作業場所');
+      if(r.type && WORK_KEYS.indexOf(r.type) >= 0 && c.works.indexOf(r.type) < 0){ c.works.push(r.type); filled.push('作業内容'); }
+      renderChips(); saveDraft();
+      $('lookupInfo').textContent = '写真アプリ「' + r.caseName + '」' + (filled.length ? 'から ' + filled.join('・') + ' を入れました' : '：入れる項目がありませんでした（写真アプリ側にお客様名・電話・現場住所が未登録）') + (r.archived ? '　※この案件は写真アプリで見送りになっています' : '') + '。部屋番号などは作業場所に書き足してください。';
+    }).catch(function(e){ $('lookupInfo').textContent = '読み込めませんでした：' + e.message; });
+  }
+  $('btnLookup').onclick = function(){ readForm(); lookupCase('', true); };
+  $('contractNo').addEventListener('change', function(){ var no = normalizeCaseNo($('contractNo').value); if(CASE_NO_RE.test(no) && !state.contract.custName && !state.contract.custTel) lookupCase(no, false); });
   $('btnSamePlace').onclick = function(){ $('place').value = $('custAddress').value; readForm(); saveDraft(); };
   $('btnFormBack').onclick = function(){ readForm(); saveLocal(); busy(true, '保存しています…'); flushServerSave().then(function(){ busy(false); goHome(); }); };
   $('btnToConfirm').onclick = function(){
@@ -752,6 +770,7 @@ var MOCK = /[?&]mock=1/.test(location.search);                              // �
     if(fn === 'getTemplateHtml') return delay({ html: MOCK_TEMPLATE });
     if(fn === 'finalize'){ var c = args[0]; var errs = validateContract(c); if(errs.length) return Promise.reject(new Error(errs.join('\n')));
       return delay({ fileName: c.contractNo + '_' + c.contractDate.replace(/-/g,'') + '.pdf', url:'#', folder:'2026年11月 / 90_その他 / 電子契約書', pdfBase64:'', signedAt:'（練習）', warnings:['練習モードのため保存・送信はしていません'] }); }
+    if(fn === 'lookupCase') return delay(args[0] === '26-0152' ? { caseNo:'26-0152', caseName:'26-0152_長野市_遺品整理', custName:'写真 花子', custTel:'090-1111-2222', place:'長野市○○町1-2-3 ハイツ101', city:'長野市', type:'遺品整理', workDate:'2026-11-20', archived:false } : Promise.reject(new Error('案件 ' + args[0] + ' は写真アプリにありません')));
     if(fn === 'listRemote') return delay({ rows: window._mockRemote || [] });
     window._mockDrafts = window._mockDrafts || {};
     if(fn === 'saveDraft'){ var dd = args[0]; window._mockDrafts[dd.draftId] = { id: dd.draftId, updated: '（練習）', updatedMs: Date.now(), by: 'test@example.com', contractNo: dd.contractNo, custName: dd.custName, staff: dd.staff, d: JSON.parse(JSON.stringify(dd)) }; return delay({ ok:true }); }
