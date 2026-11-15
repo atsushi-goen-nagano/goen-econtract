@@ -13,7 +13,7 @@ iPadでお客様に指で署名してもらう作業契約書。署名済みPDF�
 - GAS: https://script.google.com/d/1gaToKiNd2PESW90Bc0Htz9_y2pMoMavnf0cOCtSIpjeJjIV3L-do-WRd/edit （アカウント goen3378@gmail.com「あ」）
 - ウェブアプリ デプロイID `AKfycbxFGP1CRqhAH9dbwpJjSkbHbq2tyTECBc9Y_Q15oalNBm8Q63W_GEGFuqaiDOcPCsFW`（URLは docs/index.html の GAS_URL）
 - Google Cloud プロジェクト `GOEN-Keiyakusho`（クライアントID 1018313183986-…）。同意画面は「テスト中」のまま可（テストユーザー登録）
-- ひな形Doc: https://docs.google.com/document/d/10FWnbl6nD8AoJTuHLuF-5JDzXMKJ7aTX1vA76hwl33w/edit
+- ひな形Doc: https://docs.google.com/document/d/1VxPGvTi4KFc2bJ95SzO8x5Rw24OJ8CcnOeZefN_g6Wk/edit （2026-11-15 recreateTemplate で作り直し。旧版は「（旧 …）」名で同フォルダ）
 - 契約一覧: https://docs.google.com/spreadsheets/d/1_mPZILoFXcbBu0NjeTL3jFMm-8nNUtPpQzsZk0SWYsc/edit
 
 ## 直すときの約束
