@@ -40,6 +40,9 @@
   .gate.done .dot{ background:var(--green); }
   .sigbox{ position:relative; border:2px dashed var(--line); border-radius:12px; background:#fff; height:220px; touch-action:none; }
   .sigbox canvas{ width:100%; height:100%; display:block; border-radius:12px; touch-action:none; }
+  .sigbox, .sigbox *{ -webkit-user-select:none !important; user-select:none !important; -webkit-touch-callout:none !important; }
+  .sigbox{ overscroll-behavior:contain; }
+  body.signing{ -webkit-user-select:none; user-select:none; -webkit-touch-callout:none; }
   .sighint{ position:absolute; inset:0; display:flex; align-items:center; justify-content:center; color:#bbb; pointer-events:none; font-size:20px; }
   .sigline{ position:absolute; left:8%; right:8%; bottom:28%; border-bottom:1px solid #ddd; pointer-events:none; }
   .overlay{ display:none; position:fixed; inset:0; background:rgba(255,255,255,.85); z-index:9; align-items:center; justify-content:center; font-size:22px; font-weight:700; color:var(--navy); text-align:center; padding:20px; }
@@ -131,7 +134,7 @@ var MOCK = /[?&]mock=1/.test(location.search);
   var token = (new URLSearchParams(location.search)).get('t') || '';
   var state = { d:null, html:'', company:null, deliver:'', pdfBlob:null, pdfName:'' };
   var SCREENS = ['load','error','intro','doc','deliver','sign','done'];
-  function show(n){ SCREENS.forEach(function(s){ $('s-'+s).hidden = s !== n; }); window.scrollTo(0,0); if(n==='sign') setTimeout(setupCanvas, 50); }
+  function show(n){ SCREENS.forEach(function(s){ $('s-'+s).hidden = s !== n; }); window.scrollTo(0,0); document.body.classList.toggle('signing', n === 'sign'); if(n==='sign') setTimeout(setupCanvas, 50); }
   function busy(on, t){ $('overlay').textContent = t || '処理中…'; $('overlay').style.display = on ? 'flex' : 'none'; }
   function showErr(id, m){ $(id).hidden = !m; $(id).textContent = m || ''; }
   function fail(m){ $('errText').textContent = m; show('error'); }
@@ -190,6 +193,17 @@ var MOCK = /[?&]mock=1/.test(location.search);
   };
 
   // ---- 署名 ----
+  // 署名枠：iPhone/iPadの長押し選択・コピーメニュー・ダブルタップ拡大を止める
+  document.querySelectorAll('.sigbox').forEach(function(box){
+    ['contextmenu','selectstart','touchstart','touchmove','gesturestart'].forEach(function(t){
+      box.addEventListener(t, function(e){ if(t!=='touchstart' && t!=='touchmove') e.preventDefault(); else if(e.touches && e.touches.length>1) e.preventDefault(); if(t==='touchmove') e.preventDefault(); }, { passive:false });
+    });
+  });
+  document.addEventListener('selectionchange', function(){
+    var sel = window.getSelection && window.getSelection();
+    if(sel && sel.rangeCount && document.querySelector('.sigbox') && [].some.call(document.querySelectorAll('.sigbox'), function(b){ return b.contains(sel.anchorNode) || b.contains(sel.focusNode); })) sel.removeAllRanges();
+  });
+
   var cv = $('sigC'), ctx = cv.getContext('2d'), sig = { has:false, drawing:false, last:null };
   function setupCanvas(){
     var r = cv.getBoundingClientRect(), dpr = window.devicePixelRatio || 1; if(!r.width) return;
