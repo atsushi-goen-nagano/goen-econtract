@@ -80,6 +80,13 @@ function onsiteAllowed(contractDate, dateFrom) {
   return n !== null && n >= ONSITE_MIN_DAYS;
 }
 
+// Googleドキュメントを文字（HTML）に変換すると《印》の途中にタグが挟まることがある。
+// 《 と 》 の間のタグ・数値文字参照を取り除き、印を1つの文字列に戻す（確認画面の差し込み用）
+function normalizeTemplateHtml(html) {
+  html = String(html || '').replace(/&#12298;/g, '《').replace(/&#12299;/g, '》').replace(/&#(\d+);/g, function (m, n) { return String.fromCharCode(Number(n)); });
+  return html.replace(/《((?:<[^>]*>|[^《》<])*)》/g, function (m, inner) { return '《' + inner.replace(/<[^>]*>/g, '').replace(/\s+/g, '') + '》'; });
+}
+
 function isInt_(v) { return /^-?\d+$/.test(String(v).trim()); }
 
 // 入力チェック。問題がなければ []、あれば日本語のメッセージの配列
@@ -177,5 +184,5 @@ function buildReplaceMap(d, signedYmd, signedHm) {
 
 // Nodeのテストから読めるようにする（GASではこの行は何もしない）
 if (typeof module !== 'undefined') {
-  module.exports = { COMPANY_TEL: COMPANY_TEL, WORK_KEYS: WORK_KEYS, HOW_KEYS: HOW_KEYS, PLACEHOLDERS: PLACEHOLDERS, parseYmd: parseYmd, wareki: wareki, yen: yen, calcTotal: calcTotal, monthPrefix: monthPrefix, ONSITE_MIN_DAYS: ONSITE_MIN_DAYS, daysUntilWork: daysUntilWork, onsiteAllowed: onsiteAllowed, CASE_NO_RE: CASE_NO_RE, normalizeCaseNo: normalizeCaseNo, validateContract: validateContract, buildReplaceMap: buildReplaceMap };
+  module.exports = { COMPANY_TEL: COMPANY_TEL, WORK_KEYS: WORK_KEYS, HOW_KEYS: HOW_KEYS, PLACEHOLDERS: PLACEHOLDERS, parseYmd: parseYmd, wareki: wareki, yen: yen, calcTotal: calcTotal, monthPrefix: monthPrefix, normalizeTemplateHtml: normalizeTemplateHtml, ONSITE_MIN_DAYS: ONSITE_MIN_DAYS, daysUntilWork: daysUntilWork, onsiteAllowed: onsiteAllowed, CASE_NO_RE: CASE_NO_RE, normalizeCaseNo: normalizeCaseNo, validateContract: validateContract, buildReplaceMap: buildReplaceMap };
 }

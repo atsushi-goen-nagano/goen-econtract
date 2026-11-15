@@ -42,6 +42,15 @@ test('onsite vs remote by days', () => {
   assert.strictEqual(L.onsiteAllowed('2026-11-15', '2026-11-23'), true);  // 8日後 → どちらも可
   assert.strictEqual(L.onsiteAllowed('2026-11-15', ''), false);
 });
+test('normalizeTemplateHtml joins split placeholders', () => {
+  const src = '<p><span class="a">《</span><span class="b">甲氏名</span><span>》 と 《チェック:</span><span>遺品整理》</span> &#12298;合計&#12299; そのまま《作業費》</p>';
+  const out = L.normalizeTemplateHtml(src);
+  assert.ok(out.includes('《甲氏名》'));
+  assert.ok(out.includes('《チェック:遺品整理》'));
+  assert.ok(out.includes('《合計》'));
+  assert.ok(out.includes('《作業費》'));
+  assert.ok(!/《<|<[^>]*>》/.test(out));
+});
 test('validate ok', () => {
   assert.deepStrictEqual(L.validateContract(base()), []);
 });

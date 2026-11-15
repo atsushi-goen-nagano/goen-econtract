@@ -494,12 +494,15 @@ var MOCK = /[?&]mock=1/.test(location.search);                              // �
     busy(true, '契約書を用意しています…');
     getTemplateHtml().then(function(html){
       busy(false);
+      html = normalizeTemplateHtml(html);
       var map = buildReplaceMap(state.contract, state.contract.contractDate, '');
       map['《甲署名日》'] = '（締結時に記録）'; map['《乙署名日》'] = '（締結時に記録）';
       if(!state.contract.deliver){ ['LINE','メール','紙'].forEach(function(k){ map['《チェック:受取'+k+'》'] = '☐'; }); map['《承諾メール》'] = '（次の画面で選択）'; }
       Object.keys(map).forEach(function(k){ html = html.split(k).join(escapeHtml(map[k])); });
       html = html.split('《署名_甲》').join('<span class="sigph">（ここにお客様の署名）</span>').split('《署名_乙》').join('<span class="sigph">（ここに担当者の署名）</span>');
       $('doc').innerHTML = html;
+      var left = ($('doc').innerText.match(/《[^》]*》/g) || []);
+      if(left.length) $('doc').insertAdjacentHTML('afterbegin', '<div class="err">差し込めなかった項目があります：' + escapeHtml(left.join(' ')) + '<br>管理者に連絡してください（ひな形の印が壊れている可能性）</div>');
       setTimeout(checkGate, 100);
     }).catch(function(e){ busy(false); $('doc').textContent = '読み込めませんでした：' + e.message; });
   }

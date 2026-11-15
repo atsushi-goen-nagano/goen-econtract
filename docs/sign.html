@@ -166,7 +166,7 @@ var MOCK = /[?&]mock=1/.test(location.search);
     var map = buildReplaceMap(d, d.contractDate, '');
     map['《甲署名日》'] = '（署名時に記録）'; map['《乙署名日》'] = '（署名時に記録）';
     if(!state.deliver){ ['LINE','メール','紙'].forEach(function(k){ map['《チェック:受取'+k+'》'] = '☐'; }); map['《承諾メール》'] = '（次の画面で選択）'; }
-    var html = state.html;
+    var html = normalizeTemplateHtml(state.html);
     Object.keys(map).forEach(function(k){ html = html.split(k).join(escapeHtml(map[k])); });
     html = html.split('《署名_甲》').join('<span class="sigph">（ここにお客様の署名）</span>').split('《署名_乙》').join('<span class="sigph">（担当者の署名）</span>');
     $('doc').innerHTML = html; setGate(false); show('doc'); setTimeout(checkGate, 100);
