@@ -94,6 +94,10 @@
       <button class="btn sec" id="btnResume" hidden>入力途中の契約書を再開する</button>
       <button class="btn sec" id="btnList">過去の契約を探す</button>
     </div>
+    <div class="card" id="remoteCard" hidden>
+      <h2>遠隔署名 待ち</h2>
+      <div id="remoteList"></div>
+    </div>
     <div class="card">
       <p class="hint">保存先：共有ドライブ「GOEN様_小口社長」／ その月のフォルダ ／ 90_その他 ／ 電子契約書</p>
       <button class="btn sec" id="btnLogout" style="min-height:48px;font-size:16px">ログアウト</button>
@@ -191,6 +195,9 @@
         <button class="chip" data-v="メール">メールで受け取る</button>
         <button class="chip" data-v="紙">紙の控えを希望する</button>
       </div>
+      <h3 style="margin-top:20px">お客様がこの場にいない場合</h3>
+      <button class="chip" id="btnRemote" style="width:100%">遠隔署名：お客様にリンクを送って、スマホで署名してもらう</button>
+      <p class="hint">担当者が先に署名し、署名用のリンクをLINEかメールでお客様へ送ります。受け取り方法はお客様がリンク先で選びます（有効期限7日）。</p>
       <div id="deliverEmailWrap" hidden><label class="f">お客様のメールアドレス<span class="req">必須</span></label><input type="email" id="custEmail2" inputmode="email"></div>
       <div id="deliverErr" class="err" hidden></div>
       <button class="btn" id="btnToSign">署名へ進む</button>
@@ -202,10 +209,13 @@
   <section id="s-sign" hidden>
     <div class="card">
       <h2>4. ご署名</h2>
+      <div id="custSigWrap">
       <h3>お客様（甲）のご署名</h3>
       <p class="hint">枠の中に指でお名前をお書きください。</p>
       <div class="sigbox"><canvas id="sigC"></canvas><div class="sigline"></div><div class="sighint" id="sigCHint">ここに署名</div></div>
       <button class="btn sec" data-clear="sigC" style="min-height:48px;font-size:16px">書き直す</button>
+      </div>
+      <div id="remoteNote" class="warnbox" hidden>遠隔署名：お客様の署名はリンク先で行います。担当者の署名だけ済ませてください。</div>
 
       <h3>担当者（乙）の署名：<span id="signStaffName"></span></h3>
       <div class="sigbox"><canvas id="sigS"></canvas><div class="sigline"></div><div class="sighint" id="sigSHint">ここに署名</div></div>
@@ -214,6 +224,7 @@
       <div class="warnbox" style="margin-top:16px">締結すると内容は固定され、あとから変更できません。</div>
       <div id="signErr" class="err" hidden></div>
       <button class="btn ok" id="btnFinalize" disabled>契約を締結する</button>
+      <button class="btn" id="btnCreateRemote" disabled hidden>署名リンクを作る</button>
       <button class="btn sec" id="btnSignBack">戻る</button>
     </div>
   </section>
@@ -234,6 +245,22 @@
       <a class="btn sec" id="btnOpenPdf" target="_blank" rel="noopener" style="text-decoration:none;display:flex;align-items:center;justify-content:center">PDFを開く</a>
       <button class="btn sec" id="btnShareAny">控えを共有・印刷する</button>
       <button class="btn" id="btnDoneHome">ホームへ戻る</button>
+    </div>
+  </section>
+
+  <!-- 遠隔署名リンク -->
+  <section id="s-remote" hidden>
+    <div class="card">
+      <h2>署名リンクができました</h2>
+      <p id="remoteWho"></p>
+      <div class="warnbox" style="word-break:break-all;font-size:14px" id="remoteUrl"></div>
+      <p class="hint">有効期限：<span id="remoteExp"></span>。お客様が署名すると、PDFが保存され一覧に入ります。</p>
+      <button class="btn" id="btnRemoteLine">LINEで送る（共有）</button>
+      <button class="btn sec" id="btnRemoteMail">メールで送る</button>
+      <button class="btn sec" id="btnRemoteCopy">リンクをコピー</button>
+      <div id="remoteErr" class="err" hidden></div>
+      <div id="remoteOk" class="warnbox" hidden></div>
+      <button class="btn sec" id="btnRemoteHome">ホームへ戻る</button>
     </div>
   </section>
 
@@ -270,13 +297,14 @@ var MOCK = /[?&]mock=1/.test(location.search);                              // �
 (function(){
   var $ = function(id){ return document.getElementById(id); };
   var state = { session:'', user:null, staffList:['小口（代表）'], contract:null, pdfBlob:null, templateHtml:'' };
-  var SCREENS = ['login','home','form','confirm','deliver','sign','done','list'];
+  var SCREENS = ['login','home','form','confirm','deliver','sign','done','list','remote'];
+  var remoteMode = false;
 
   // ---- 画面切替 ----
   function show(name){
     SCREENS.forEach(function(s){ $('s-'+s).hidden = (s !== name); });
     $('wrap').scrollTop = 0;
-    if(name === 'sign') setTimeout(function(){ setupCanvas('sigC'); setupCanvas('sigS'); }, 50);
+    if(name === 'sign'){ $('custSigWrap').hidden = remoteMode; $('remoteNote').hidden = !remoteMode; $('btnFinalize').hidden = remoteMode; $('btnCreateRemote').hidden = !remoteMode; setTimeout(function(){ setupCanvas('sigC'); setupCanvas('sigS'); }, 50); }
   }
   function busy(on, text){ $('overlay').textContent = text || '処理中…'; $('overlay').style.display = on ? 'flex' : 'none'; }
   function showErr(id, msg){ var el = $(id); el.hidden = !msg; el.textContent = msg || ''; }
@@ -339,7 +367,22 @@ var MOCK = /[?&]mock=1/.test(location.search);                              // �
   // ---- ホーム ----
   function goHome(){
     $('btnResume').hidden = !loadDraft();
-    show('home');
+    show('home'); loadRemoteList();
+  }
+  function loadRemoteList(){
+    api('listRemote').then(function(r){
+      $('remoteCard').hidden = !r.rows.length;
+      var h = '';
+      r.rows.forEach(function(x){
+        h += '<div style="border-bottom:1px solid var(--line);padding:10px 0"><b>' + escapeHtml(x.contractNo) + '</b>　' + escapeHtml(x.custName) + ' 様　<span class="pill">' + escapeHtml(x.expired ? '期限切れ' : x.status) + '</span>' +
+          '<div class="hint">担当 ' + escapeHtml(x.staff) + '／作成 ' + escapeHtml(x.created) + '／期限 ' + escapeHtml(x.exp) + (x.sentTo ? '／送付 ' + escapeHtml(x.sentTo) : '') + '</div>' +
+          '<div class="row"><button class="btn sec" style="min-height:44px;font-size:15px;margin-top:8px" data-reshare="' + escapeHtml(x.token) + '">リンクを再送</button>' +
+          '<button class="btn sec" style="min-height:44px;font-size:15px;margin-top:8px;color:var(--red);border-color:var(--red)" data-cancel="' + escapeHtml(x.token) + '">取り消す</button></div></div>';
+      });
+      $('remoteList').innerHTML = h;
+      $('remoteList').querySelectorAll('[data-reshare]').forEach(function(b){ b.onclick = function(){ var x = r.rows.filter(function(y){ return y.token === b.dataset.reshare; })[0]; showRemote({ url:x.url, exp:x.exp, token:x.token }, { custName:x.custName, custEmail:x.custEmail, contractNo:x.contractNo }); }; });
+      $('remoteList').querySelectorAll('[data-cancel]').forEach(function(b){ b.onclick = function(){ if(!confirm('この署名リンクを取り消しますか？お客様は開けなくなります。')) return; busy(true); api('cancelRemote', [b.dataset.cancel]).then(function(){ busy(false); loadRemoteList(); }).catch(function(e){ busy(false); alert(e.message); }); }; });
+    }).catch(function(){ $('remoteCard').hidden = true; });
   }
   $('btnNew').onclick = function(){
     if(loadDraft() && !confirm('入力途中の契約書があります。捨てて新しく作りますか？')) return;
@@ -467,10 +510,15 @@ var MOCK = /[?&]mock=1/.test(location.search);                              // �
   // ---- 受け取り方法 ----
   $('custEmail2').addEventListener('input', function(){ state.contract.custEmail = $('custEmail2').value.trim(); $('custEmail').value = state.contract.custEmail; saveDraft(); });
   $('btnDeliverBack').onclick = function(){ openConfirm(); };
+  $('btnRemote').onclick = function(){
+    var errs = validateContract(state.contract, { skipDeliver: true });
+    if(errs.length){ showErr('deliverErr', errs.join('\n')); return; }
+    showErr('deliverErr', ''); remoteMode = true; $('signStaffName').textContent = state.contract.staff; show('sign');
+  };
   $('btnToSign').onclick = function(){
     var errs = validateContract(state.contract);
     if(errs.length){ showErr('deliverErr', errs.join('\n')); return; }
-    showErr('deliverErr', ''); $('signStaffName').textContent = state.contract.staff; show('sign');
+    showErr('deliverErr', ''); remoteMode = false; $('signStaffName').textContent = state.contract.staff; show('sign');
   };
 
   // ---- 署名 ----
@@ -502,7 +550,7 @@ var MOCK = /[?&]mock=1/.test(location.search);                              // �
   });
   document.querySelectorAll('[data-clear]').forEach(function(b){ b.onclick = function(){ setupCanvas(b.dataset.clear); }; });
   window.addEventListener('resize', function(){ ['sigC','sigS'].forEach(function(id){ if(sigs[id] && !sigs[id].has) setupCanvas(id); }); });
-  function updateFinalizeBtn(){ $('btnFinalize').disabled = !(sigs.sigC && sigs.sigC.has && sigs.sigS && sigs.sigS.has); }
+  function updateFinalizeBtn(){ $('btnFinalize').disabled = !(sigs.sigC && sigs.sigC.has && sigs.sigS && sigs.sigS.has); $('btnCreateRemote').disabled = !(sigs.sigS && sigs.sigS.has); }
   function sigData(id){
     var cv = $(id), out = document.createElement('canvas');
     out.width = cv.width; out.height = cv.height;
@@ -518,6 +566,34 @@ var MOCK = /[?&]mock=1/.test(location.search);                              // �
       busy(false); clearDraft(); showDone(r);
     }).catch(function(e){ busy(false); showErr('signErr', e.message); });
   };
+
+  // ---- 遠隔署名リンク ----
+  var remote = null;
+  $('btnCreateRemote').onclick = function(){
+    var c = Object.assign({}, state.contract, { sigStaff: sigData('sigS') });
+    busy(true, '署名リンクを作っています…');
+    api('createRemote', [c]).then(function(r){ busy(false); clearDraft(); showRemote(r, state.contract); }).catch(function(e){ busy(false); showErr('signErr', e.message); });
+  };
+  function showRemote(r, c){
+    remote = { url:r.url, token:r.token, exp:r.exp, custName:c.custName, custEmail:c.custEmail || '', contractNo:c.contractNo };
+    $('remoteWho').textContent = c.custName + ' 様（契約番号 ' + c.contractNo + '）に、このリンクを送ってください。';
+    $('remoteUrl').textContent = r.url; $('remoteExp').textContent = r.exp;
+    showErr('remoteErr', ''); $('remoteOk').hidden = true; show('remote');
+  }
+  function remoteText(){ return remote.custName + ' 様\n株式会社GOENです。作業契約書のご確認とご署名を下のリンクからお願いいたします（' + remote.exp + ' まで有効）。\n' + remote.url; }
+  $('btnRemoteLine').onclick = function(){
+    if(navigator.share) navigator.share({ title:'作業契約書のご署名のお願い', text: remoteText() }).catch(function(){});
+    else { copyText(remoteText()); alert('文面をコピーしました。LINEに貼り付けて送ってください。'); }
+  };
+  $('btnRemoteCopy').onclick = function(){ copyText(remote.url); $('remoteOk').hidden = false; $('remoteOk').textContent = 'リンクをコピーしました'; };
+  $('btnRemoteMail').onclick = function(){
+    var email = prompt('お客様のメールアドレス', remote.custEmail || ''); if(email === null) return;
+    busy(true, 'メールを送っています…');
+    api('remoteSendLink', [remote.token, email.trim()]).then(function(){ busy(false); $('remoteOk').hidden = false; $('remoteOk').textContent = email.trim() + ' へ署名のお願いメールを送りました'; })
+      .catch(function(e){ busy(false); showErr('remoteErr', e.message); });
+  };
+  function copyText(t){ try{ navigator.clipboard.writeText(t); }catch(_){ var ta = document.createElement('textarea'); ta.value = t; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); } }
+  $('btnRemoteHome').onclick = function(){ state.contract = null; remoteMode = false; goHome(); };
 
   // ---- 完了 ----
   function b64ToBlob(b64){ var bin = atob(b64), arr = new Uint8Array(bin.length); for(var i=0;i<bin.length;i++) arr[i] = bin.charCodeAt(i); return new Blob([arr], { type:'application/pdf' }); }
@@ -570,6 +646,10 @@ var MOCK = /[?&]mock=1/.test(location.search);                              // �
     if(fn === 'getTemplateHtml') return delay({ html: MOCK_TEMPLATE });
     if(fn === 'finalize'){ var c = args[0]; var errs = validateContract(c); if(errs.length) return Promise.reject(new Error(errs.join('\n')));
       return delay({ fileName: c.contractNo + '_' + c.contractDate.replace(/-/g,'') + '.pdf', url:'#', folder:'2026年11月 / 90_その他 / 電子契約書', pdfBase64:'', signedAt:'（練習）', warnings:['練習モードのため保存・送信はしていません'] }); }
+    if(fn === 'listRemote') return delay({ rows: window._mockRemote || [] });
+    if(fn === 'createRemote'){ var c2 = args[0]; var errs2 = validateContract(c2, { skipDeliver:true }); if(errs2.length) return Promise.reject(new Error(errs2.join('\n'))); var tk = 'mock-' + Date.now(); window._mockRemote = (window._mockRemote || []).concat([{ token:tk, url: location.origin + location.pathname.replace('index.html','') + 'sign.html?mock=1&t=' + tk, contractNo:c2.contractNo, custName:c2.custName, staff:c2.staff, created:'（練習）', exp:'7日後', expired:false, status:'未開封', opened:0, sentTo:'', custEmail:c2.custEmail }]); return delay({ token:tk, url: window._mockRemote[window._mockRemote.length-1].url, exp:'7日後' }); }
+    if(fn === 'remoteSendLink') return delay({ ok:true });
+    if(fn === 'cancelRemote'){ window._mockRemote = (window._mockRemote || []).filter(function(x){ return x.token !== args[0]; }); return delay({ ok:true }); }
     if(fn === 'listContracts') return delay({ isAdmin:true, rows:[{ contractNo:'26-0152', contractDate:'2026-11-01', signedAt:'2026-11-01 14:05', staff:'小口（代表）', custName:'テスト 太郎', works:'遺品整理', total:220000, deliver:'メール', url:'#' }] });
     return Promise.reject(new Error('練習モードにない機能: ' + fn));
   }

@@ -66,8 +66,8 @@ function normalizeCaseNo(s) {
 function isInt_(v) { return /^-?\d+$/.test(String(v).trim()); }
 
 // 入力チェック。問題がなければ []、あれば日本語のメッセージの配列
-function validateContract(d) {
-  d = d || {};
+function validateContract(d, opts) {
+  d = d || {}; opts = opts || {};
   var e = [];
   var need = function (key, label) { if (!String(d[key] || '').trim()) e.push(label + 'を入力してください'); };
   var no = normalizeCaseNo(d.contractNo);
@@ -105,6 +105,7 @@ function validateContract(d) {
     if (HOW_KEYS.indexOf(d.payFirstHow) < 0) e.push('1回目のお支払い方法（現金／振込）を選んでください');
     if (HOW_KEYS.indexOf(d.payRestHow) < 0) e.push('残金のお支払い方法（現金／振込）を選んでください');
   }
+  if (opts.skipDeliver) return e;
   if (!DELIVER_KEYS[d.deliver]) e.push('控えの受け取り方法を選んでください');
   if (d.deliver === 'メール' && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(d.custEmail || '').trim())) e.push('メールで送るにはお客様のメールアドレスが必要です');
   return e;

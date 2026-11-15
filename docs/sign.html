@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<title>作業契約書のご署名｜株式会社GOEN</title>
+<style>
+  :root{ --bg:#f7f5f1; --card:#fff; --ink:#1b1b1b; --sub:#666; --line:#d9d4cc; --navy:#1d4e89; --red:#c0392b; --green:#2e7d32; }
+  *{ box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  [hidden]{ display:none !important; }
+  html,body{ margin:0; background:var(--bg); color:var(--ink); font-family:-apple-system,"Hiragino Sans","Hiragino Kaku Gothic ProN",sans-serif; font-size:18px; }
+  .wrap{ max-width:760px; margin:0 auto; padding:16px 14px 40vh; }
+  .brand{ color:var(--navy); font-weight:800; font-size:20px; margin:4px 0 12px; }
+  .card{ background:var(--card); border:1px solid var(--line); border-radius:14px; padding:18px; margin-bottom:14px; }
+  h2{ font-size:22px; margin:0 0 12px; }
+  p{ line-height:1.7; }
+  .hint{ color:var(--sub); font-size:15px; }
+  button{ font-family:inherit; border-radius:12px; border:none; cursor:pointer; }
+  .btn{ display:block; width:100%; min-height:60px; font-size:20px; font-weight:700; padding:14px; color:#fff; background:var(--navy); margin-top:12px; }
+  .btn.sec{ background:#fff; color:var(--navy); border:2px solid var(--navy); }
+  .btn.ok{ background:var(--green); }
+  .btn:disabled{ opacity:.4; cursor:default; }
+  .chips{ display:flex; flex-direction:column; gap:8px; }
+  .chip{ min-height:56px; padding:10px 16px; font-size:18px; border:2px solid var(--line); border-radius:12px; background:#fff; color:var(--ink); text-align:left; }
+  .chip.on{ border-color:var(--navy); background:#e8f0fa; color:var(--navy); font-weight:700; }
+  input[type=email]{ width:100%; font:inherit; font-size:20px; padding:12px 14px; border:1.5px solid var(--line); border-radius:10px; margin-top:8px; }
+  .err{ background:#fdecea; color:var(--red); border:1px solid #f5c6c2; border-radius:10px; padding:12px; margin:10px 0; white-space:pre-line; font-size:16px; }
+  .warnbox{ background:#fff7e0; border:1px solid #f1d58a; border-radius:10px; padding:12px; margin:10px 0; font-size:16px; }
+  .docbox{ background:#fff; border:1px solid var(--line); border-radius:12px; height:60vh; overflow-y:auto; -webkit-overflow-scrolling:touch; padding:16px; }
+  .doc{ font-size:17px; line-height:1.7; }
+  .doc *{ font-size:inherit !important; line-height:inherit !important; font-family:inherit !important; }
+  .doc p{ margin:0 0 8px; }
+  .doc table{ width:100% !important; border-collapse:collapse; margin:8px 0; }
+  .doc td{ border:1px solid #999; padding:6px 8px; width:auto !important; vertical-align:top; }
+  .doc img{ display:none; }
+  .doc .sigph{ display:inline-block; min-width:160px; color:#999; }
+  .gate{ display:flex; align-items:center; gap:10px; margin-top:12px; color:var(--sub); font-size:16px; }
+  .gate .dot{ width:14px; height:14px; border-radius:50%; background:#ccc; }
+  .gate.done .dot{ background:var(--green); }
+  .sigbox{ position:relative; border:2px dashed var(--line); border-radius:12px; background:#fff; height:220px; touch-action:none; }
+  .sigbox canvas{ width:100%; height:100%; display:block; border-radius:12px; touch-action:none; }
+  .sighint{ position:absolute; inset:0; display:flex; align-items:center; justify-content:center; color:#bbb; pointer-events:none; font-size:20px; }
+  .sigline{ position:absolute; left:8%; right:8%; bottom:28%; border-bottom:1px solid #ddd; pointer-events:none; }
+  .overlay{ display:none; position:fixed; inset:0; background:rgba(255,255,255,.85); z-index:9; align-items:center; justify-content:center; font-size:22px; font-weight:700; color:var(--navy); text-align:center; padding:20px; }
+  .big{ font-size:24px; font-weight:800; }
+  .center{ text-align:center; }
+  dl{ margin:0; } dt{ color:var(--sub); font-size:14px; margin-top:8px; } dd{ margin:0; font-weight:700; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="brand">株式会社GOEN　作業契約書</div>
+
+  <section id="s-load" class="card"><p>契約書を読み込んでいます…</p></section>
+  <section id="s-error" class="card" hidden><h2>開けませんでした</h2><div class="err" id="errText"></div></section>
+
+  <!-- 1. はじめに -->
+  <section id="s-intro" class="card" hidden>
+    <h2>ご署名のお願い</h2>
+    <p><b id="introName"></b> 様</p>
+    <p>株式会社GOEN 担当 <b id="introStaff"></b> がご説明した作業の契約書です。内容をご確認のうえ、画面に指でご署名ください。</p>
+    <dl>
+      <dt>契約番号</dt><dd id="introNo"></dd>
+      <dt>作業予定日</dt><dd id="introDate"></dd>
+      <dt>合計お支払い額（税込）</dt><dd id="introTotal"></dd>
+      <dt>このリンクの有効期限</dt><dd id="introExp"></dd>
+    </dl>
+    <p class="hint" style="margin-top:14px">ご不明な点は、署名の前に <b id="introTel"></b> までお気軽にご連絡ください。</p>
+    <button class="btn" id="btnStart">契約書を読む</button>
+  </section>
+
+  <!-- 2. 全文 -->
+  <section id="s-doc" class="card" hidden>
+    <h2>契約書の内容</h2>
+    <p class="hint">最後までスクロールしてご確認ください。</p>
+    <div class="docbox" id="docbox"><div class="doc" id="doc"></div></div>
+    <div class="gate" id="gate"><span class="dot"></span><span id="gateText">最後までスクロールすると次へ進めます</span></div>
+    <button class="btn" id="btnToDeliver" disabled>内容を確認しました（次へ）</button>
+  </section>
+
+  <!-- 3. 控えの受け取り -->
+  <section id="s-deliver" class="card" hidden>
+    <h2>控えの受け取り方法</h2>
+    <p>署名後、契約書の控え（PDF）をお渡しします。受け取り方法をお選びください。</p>
+    <div class="chips">
+      <button class="chip" data-v="メール">メールで受け取る（署名後すぐに届きます）</button>
+      <button class="chip" data-v="LINE">LINEで受け取る（担当者からお送りします）</button>
+      <button class="chip" data-v="紙">紙の控えを郵送で受け取る</button>
+    </div>
+    <div id="emailWrap" hidden><label class="hint">メールアドレス</label><input type="email" id="custEmail" inputmode="email" autocomplete="email"></div>
+    <div id="deliverErr" class="err" hidden></div>
+    <button class="btn" id="btnToSign">署名へ進む</button>
+    <button class="btn sec" id="btnBackDoc">契約書に戻る</button>
+  </section>
+
+  <!-- 4. 署名 -->
+  <section id="s-sign" class="card" hidden>
+    <h2>ご署名</h2>
+    <p>枠の中に、指でお名前をお書きください。</p>
+    <div class="sigbox"><canvas id="sigC"></canvas><div class="sigline"></div><div class="sighint" id="sigCHint">ここに署名</div></div>
+    <button class="btn sec" id="btnClear" style="min-height:48px;font-size:16px">書き直す</button>
+    <div class="warnbox" style="margin-top:16px">「契約に同意して署名する」を押すと契約が成立し、内容は変更できなくなります。</div>
+    <div id="signErr" class="err" hidden></div>
+    <button class="btn ok" id="btnFinalize" disabled>契約に同意して署名する</button>
+    <button class="btn sec" id="btnBackDeliver">戻る</button>
+  </section>
+
+  <!-- 5. 完了 -->
+  <section id="s-done" class="card center" hidden>
+    <div class="big" style="color:var(--green)">ご署名ありがとうございました</div>
+    <p id="doneNo" class="big"></p>
+    <p id="doneInfo" class="hint"></p>
+    <p id="doneMail" hidden>契約書の控え（PDF）をメールでお送りしました。届かない場合はご連絡ください。</p>
+    <p id="doneLine" hidden>契約書の控え（PDF）は、担当者からLINEでお送りします。</p>
+    <p id="donePaper" hidden>紙の控えを郵送いたします。控えには署名・押印をしないでください。</p>
+    <button class="btn sec" id="btnSave">控え（PDF）をこの端末に保存・表示する</button>
+    <p class="hint">この画面は閉じていただいて構いません。</p>
+  </section>
+</div>
+<div class="overlay" id="overlay">処理中…</div>
+
+<script src="./logic.js"></script>
+<script>
+var GAS_URL = 'https://script.google.com/macros/s/AKfycbxFGP1CRqhAH9dbwpJjSkbHbq2tyTECBc9Y_Q15oalNBm8Q63W_GEGFuqaiDOcPCsFW/exec';
+var MOCK = /[?&]mock=1/.test(location.search);
+</script>
+<script>
+(function(){
+  var $ = function(id){ return document.getElementById(id); };
+  var token = (new URLSearchParams(location.search)).get('t') || '';
+  var state = { d:null, html:'', company:null, deliver:'', pdfBlob:null, pdfName:'' };
+  var SCREENS = ['load','error','intro','doc','deliver','sign','done'];
+  function show(n){ SCREENS.forEach(function(s){ $('s-'+s).hidden = s !== n; }); window.scrollTo(0,0); if(n==='sign') setTimeout(setupCanvas, 50); }
+  function busy(on, t){ $('overlay').textContent = t || '処理中…'; $('overlay').style.display = on ? 'flex' : 'none'; }
+  function showErr(id, m){ $(id).hidden = !m; $(id).textContent = m || ''; }
+  function fail(m){ $('errText').textContent = m; show('error'); }
+  function escapeHtml(s){ return String(s).replace(/[&<>"]/g, function(ch){ return { '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[ch]; }).replace(/\n/g, '<br>'); }
+
+  function api(fn, args){
+    if(MOCK) return mockApi(fn, args || []);
+    return fetch(GAS_URL, { method:'POST', body: JSON.stringify({ fn: fn, args: args || [] }) })
+      .then(function(r){ return r.json(); })
+      .then(function(j){ if(j && j.ok) return j.result; throw new Error((j && j.error) || '不明なエラー'); },
+            function(e){ throw new Error('通信できませんでした。電波の良い場所でもう一度お試しください'); });
+  }
+
+  // ---- 読み込み ----
+  if(!token && !MOCK){ fail('リンクが正しくありません。お送りしたリンクをそのまま開いてください。'); }
+  else {
+    api('remoteGet', [token, navigator.userAgent]).then(function(r){
+      state.d = r.d; state.html = r.html; state.company = r.company || { tel:'026-405-8085' };
+      var d = r.d;
+      $('introName').textContent = d.custName; $('introStaff').textContent = r.staff || d.staff; $('introNo').textContent = d.contractNo;
+      $('introDate').textContent = wareki(d.dateFrom) + ' 〜 ' + wareki(d.dateTo);
+      $('introTotal').textContent = yen(calcTotal(d.fee, d.buy)) + ' 円'; $('introExp').textContent = r.exp ? new Date(r.exp).toLocaleString('ja-JP') : '';
+      $('introTel').textContent = state.company.tel;
+      if(d.custEmail) $('custEmail').value = d.custEmail;
+      show('intro');
+    }).catch(function(e){ fail(e.message); });
+  }
+
+  // ---- 全文 ----
+  $('btnStart').onclick = function(){
+    var d = Object.assign({}, state.d, { deliver: state.deliver });
+    var map = buildReplaceMap(d, d.contractDate, '');
+    map['《甲署名日》'] = '（署名時に記録）'; map['《乙署名日》'] = '（署名時に記録）';
+    if(!state.deliver){ ['LINE','メール','紙'].forEach(function(k){ map['《チェック:受取'+k+'》'] = '☐'; }); map['《承諾メール》'] = '（次の画面で選択）'; }
+    var html = state.html;
+    Object.keys(map).forEach(function(k){ html = html.split(k).join(escapeHtml(map[k])); });
+    html = html.split('《署名_甲》').join('<span class="sigph">（ここにお客様の署名）</span>').split('《署名_乙》').join('<span class="sigph">（担当者の署名）</span>');
+    $('doc').innerHTML = html; setGate(false); show('doc'); setTimeout(checkGate, 100);
+  };
+  function setGate(ok){ $('gate').classList.toggle('done', ok); $('btnToDeliver').disabled = !ok; $('gateText').textContent = ok ? '最後まで確認しました' : '最後までスクロールすると次へ進めます'; }
+  function checkGate(){ var b = $('docbox'); if(b.scrollTop + b.clientHeight >= b.scrollHeight - 24) setGate(true); }
+  $('docbox').addEventListener('scroll', checkGate);
+  $('btnToDeliver').onclick = function(){ show('deliver'); };
+
+  // ---- 受け取り ----
+  document.querySelectorAll('#s-deliver .chip').forEach(function(b){
+    b.onclick = function(){ state.deliver = b.dataset.v; document.querySelectorAll('#s-deliver .chip').forEach(function(x){ x.classList.toggle('on', x === b); }); $('emailWrap').hidden = state.deliver !== 'メール'; };
+  });
+  $('btnBackDoc').onclick = function(){ $('btnStart').onclick(); };
+  $('btnToSign').onclick = function(){
+    var d = Object.assign({}, state.d, { deliver: state.deliver, custEmail: $('custEmail').value.trim() });
+    var errs = validateContract(d).filter(function(m){ return m.indexOf('受け取り') >= 0 || m.indexOf('メール') >= 0; });
+    if(!state.deliver) errs = ['控えの受け取り方法を選んでください'];
+    if(errs.length){ showErr('deliverErr', errs.join('\n')); return; }
+    showErr('deliverErr', ''); show('sign');
+  };
+
+  // ---- 署名 ----
+  var cv = $('sigC'), ctx = cv.getContext('2d'), sig = { has:false, drawing:false, last:null };
+  function setupCanvas(){
+    var r = cv.getBoundingClientRect(), dpr = window.devicePixelRatio || 1; if(!r.width) return;
+    cv.width = Math.round(r.width*dpr); cv.height = Math.round(r.height*dpr); ctx.setTransform(dpr,0,0,dpr,0,0);
+    ctx.lineWidth = 3; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.strokeStyle = '#111';
+    sig = { has:false, drawing:false, last:null }; $('sigCHint').style.display = 'flex'; $('btnFinalize').disabled = true;
+  }
+  function pos(e){ var r = cv.getBoundingClientRect(); return { x:e.clientX - r.left, y:e.clientY - r.top }; }
+  cv.addEventListener('pointerdown', function(e){ e.preventDefault(); sig.drawing = true; sig.last = pos(e); try{ cv.setPointerCapture(e.pointerId); }catch(_){}
+    ctx.beginPath(); ctx.arc(sig.last.x, sig.last.y, 1.2, 0, Math.PI*2); ctx.fillStyle = '#111'; ctx.fill();
+    if(!sig.has){ sig.has = true; $('sigCHint').style.display = 'none'; $('btnFinalize').disabled = false; } });
+  cv.addEventListener('pointermove', function(e){ if(!sig.drawing) return; e.preventDefault(); var p = pos(e); ctx.beginPath(); ctx.moveTo(sig.last.x, sig.last.y); ctx.lineTo(p.x, p.y); ctx.stroke(); sig.last = p; });
+  ['pointerup','pointercancel','pointerleave'].forEach(function(t){ cv.addEventListener(t, function(){ sig.drawing = false; }); });
+  $('btnClear').onclick = setupCanvas;
+  window.addEventListener('resize', function(){ if(!sig.has) setupCanvas(); });
+  $('btnBackDeliver').onclick = function(){ show('deliver'); };
+  function sigData(){ var out = document.createElement('canvas'); out.width = cv.width; out.height = cv.height; var o = out.getContext('2d'); o.fillStyle = '#fff'; o.fillRect(0,0,out.width,out.height); o.drawImage(cv,0,0); return out.toDataURL('image/png'); }
+
+  $('btnFinalize').onclick = function(){
+    if(!confirm('この内容で契約に同意し、署名します。よろしいですか？')) return;
+    busy(true, '契約書を作成しています…\n（20秒ほどかかります）');
+    api('remoteSign', [token, sigData(), state.deliver, $('custEmail').value.trim(), navigator.userAgent]).then(function(r){
+      busy(false);
+      state.pdfName = r.fileName; state.pdfBlob = r.pdfBase64 ? b64ToBlob(r.pdfBase64) : null;
+      $('doneNo').textContent = state.d.contractNo; $('doneInfo').textContent = '署名日時 ' + r.signedAt;
+      $('doneMail').hidden = !(r.deliver === 'メール' && r.mailed); $('doneLine').hidden = r.deliver !== 'LINE'; $('donePaper').hidden = r.deliver !== '紙';
+      if(r.deliver === 'メール' && !r.mailed) $('doneInfo').textContent += '　※メール送信に失敗したため、担当者から別途お送りします';
+      show('done');
+    }).catch(function(e){ busy(false); showErr('signErr', e.message); });
+  };
+  function b64ToBlob(b64){ var bin = atob(b64), arr = new Uint8Array(bin.length); for(var i=0;i<bin.length;i++) arr[i] = bin.charCodeAt(i); return new Blob([arr], { type:'application/pdf' }); }
+  $('btnSave').onclick = function(){
+    if(!state.pdfBlob){ alert('PDFがありません。担当者にご連絡ください。'); return; }
+    var file = new File([state.pdfBlob], state.pdfName, { type:'application/pdf' });
+    if(navigator.share && (!navigator.canShare || navigator.canShare({ files:[file] }))) navigator.share({ files:[file], title:'作業契約書の控え' }).catch(function(){});
+    else { var a = document.createElement('a'); a.href = URL.createObjectURL(state.pdfBlob); a.target = '_blank'; a.rel = 'noopener'; a.click(); }
+  };
+
+  // ---- 練習モード ----
+  function mockApi(fn, args){
+    var delay = function(v){ return new Promise(function(r){ setTimeout(function(){ r(v); }, 300); }); };
+    if(fn === 'remoteGet') return delay({ d:{ contractNo:'26-0152', contractDate:'2026-11-15', custAddress:'長野市○○1-2-3', custName:'テスト 太郎', custTel:'090-0000-0000', custEmail:'', staff:'小口（代表）', works:['遺品整理'], worksOther:'', scope:'2階の全部屋', place:'長野市○○1-2-3', dateFrom:'2026-11-20', dateTo:'2026-11-21', attend:'なし', keyKeep:'あり', keyReturn:'2026-11-22', fee:230000, buy:0, payMethod:'2回', payDays:'', payFirstAmount:10000, payFirstDate:'2026-11-16', payFirstHow:'現金', payRestDate:'2026-12-10', payRestHow:'振込', searchItems:'通帳' },
+      exp: Date.now()+6*86400000, status:'開封済', staff:'小口（代表）', company:{ tel:'026-405-8085' },
+      html:'<p><b>【控】印刷した本書は電子契約書の控え（写し）です。</b></p><p style="text-align:center"><b>作業契約書</b></p><p>契約番号：《契約番号》　契約日：《契約日》</p><table><tr><td>甲</td><td>《甲氏名》</td></tr><tr><td>合計</td><td>《合計》 円</td></tr></table><p>《チェック:支払2回》2回払い：1回目《分割1回目金額》円を《分割1回目日》までに《分割1回目方法》、残金《分割残金》円を《分割残金日》までに《分割残金方法》</p><p>' + new Array(25).join('この契約に定めのないことは甲乙が誠意をもって話し合って決めます。') + '</p><p>《チェック:受取LINE》LINE　《チェック:受取メール》メール（《承諾メール》）　《チェック:受取紙》紙</p><table><tr><td>甲</td><td>《署名_甲》</td><td>《甲署名日》</td></tr><tr><td>乙</td><td>《署名_乙》</td><td>《乙署名日》</td></tr></table>' });
+    if(fn === 'remoteSign') return delay({ fileName:'26-0152_20261115.pdf', pdfBase64:'', signedAt:'（練習）', deliver: args[2], mailed: args[2] === 'メール' });
+    return Promise.reject(new Error('練習モードにない機能'));
+  }
+})();
+</script>
+</body>
+</html>

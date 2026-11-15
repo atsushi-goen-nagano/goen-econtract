@@ -20,8 +20,12 @@ var SHEET_NAME = '電子契約書 契約一覧';
 var SESSION_HOURS = 12;
 var MAIL_FROM = 'info@goen-nagano.com';
 var FOLDER_MIME = 'application/vnd.google-apps.folder';
+var REMOTE_DAYS = 7;                                   // 遠隔署名リンクの有効日数
+var REMOTE_PENDING_FOLDER = '遠隔署名（待ち）';
+var REMOTE_DONE_FOLDER = '遠隔署名（記録）';
+var SIGN_PAGE_URL = 'https://atsushi-goen-nagano.github.io/goen-econtract/sign.html';
 
-var SHEET_HEADER = ['契約番号', '契約日', '締結日時', '担当者', '作成者', 'お客様名', '作業内容', '作業費', '買取額', '合計', '支払方法', '送付方法', '送付先', 'PDFリンク', 'ファイルID', 'SHA-256', '作業予定日', 'メール送信'];
+var SHEET_HEADER = ['契約番号', '契約日', '締結日時', '担当者', '作成者', 'お客様名', '作業内容', '作業費', '買取額', '合計', '支払方法', '送付方法', '送付先', 'PDFリンク', 'ファイルID', 'SHA-256', '作業予定日', 'メール送信', '署名方法', '遠隔記録'];
 
 function props_() { return PropertiesService.getScriptProperties(); }
 function prop_(k) { return String(props_().getProperty(k) || '').trim(); }
@@ -34,7 +38,10 @@ function doGet() {
     .setTitle('電子契約書｜GOEN');
 }
 
-var API_FUNCS = { newContract: newContract, getTemplateHtml: getTemplateHtml, finalize: finalize, listContracts: listContracts, whoami: whoami };
+var API_FUNCS = { newContract: newContract, getTemplateHtml: getTemplateHtml, finalize: finalize, listContracts: listContracts, whoami: whoami,
+  createRemote: createRemote, listRemote: listRemote, cancelRemote: cancelRemote, remoteSendLink: remoteSendLink };
+// お客様側（ログインなし・リンクの合言葉だけで呼べる）
+var PUBLIC_FUNCS = { remoteGet: remoteGet, remoteSign: remoteSign };
 
 function doPost(e) {
   var out;
@@ -43,6 +50,8 @@ function doPost(e) {
     var args = Array.isArray(body.args) ? body.args : [];
     if (body.fn === 'login') {
       out = { ok: true, result: login(args[0]) };
+    } else if (PUBLIC_FUNCS[String(body.fn || '')]) {
+      out = { ok: true, result: PUBLIC_FUNCS[body.fn].apply(null, args) };
     } else {
       var user = requireSession_(body.session);
       var fn = API_FUNCS[String(body.fn || '')];
@@ -128,15 +137,23 @@ function getTemplateHtml(user) {
 // ===== 締結：PDF作成 → 保存 → ロック → 一覧 → メール =====
 function finalize(user, d) {
   d = d || {};
-  var errors = validateContract(d);
+  precheck_(d, {});
+  return finalizeCore_(d, sigBlob_(d.sigCustomer, 'お客様'), sigBlob_(d.sigStaff, '担当者'), { by: user.email, how: '現地', note: '' });
+}
+
+// 入力・担当者・契約番号の重複・ひな形の点検（締結前の共通チェック）
+function precheck_(d, opts) {
+  var errors = validateContract(d, opts);
   if (errors.length) throw new Error(errors.join('\n'));
   if (STAFF_LIST.indexOf(d.staff) < 0) throw new Error('担当者が一覧にありません：' + d.staff);
   d.contractNo = normalizeCaseNo(d.contractNo);
   assertCaseNoUnused_(d.contractNo);
   var tpl = safeCheckTemplate_();
   if (!tpl.ok) throw new Error('契約書のひな形に問題があります（' + (tpl.error || ('不足:' + tpl.missing.join(' ') + ' 不明:' + tpl.unknown.join(' '))) + '）。ひな形を直してから締結してください');
+}
 
-  var sigC = sigBlob_(d.sigCustomer, 'お客様'), sigS = sigBlob_(d.sigStaff, '担当者');
+// PDF作成 → 保存 → ロック → 一覧 → メール（現地署名・遠隔署名の両方から使う）
+function finalizeCore_(d, sigC, sigS, meta) {
   var now = new Date();
   var signedYmd = Utilities.formatDate(now, TZ, 'yyyy-MM-dd'), signedHm = Utilities.formatDate(now, TZ, 'HH:mm');
   var map = buildReplaceMap(d, signedYmd, signedHm);
@@ -156,14 +173,124 @@ function finalize(user, d) {
     catch (e) { mailResult = '失敗'; warnings.push('メールが送れませんでした（' + e.message + '）。LINEか紙でお渡しください'); }
   }
   try {
-    appendRow_([d.contractNo, d.contractDate, Utilities.formatDate(now, TZ, 'yyyy-MM-dd HH:mm:ss'), d.staff, user.email, d.custName,
+    appendRow_([d.contractNo, d.contractDate, Utilities.formatDate(now, TZ, 'yyyy-MM-dd HH:mm:ss'), d.staff, meta.by, d.custName,
       (d.works || []).join('・') + (d.works && d.works.indexOf('その他') >= 0 ? '（' + d.worksOther + '）' : ''),
       Number(d.fee), Number(d.buy), calcTotal(d.fee, d.buy), payLabel_(d),
-      d.deliver, d.deliver === 'メール' ? d.custEmail : '', file.getUrl(), file.getId(), hash, d.dateFrom + '〜' + d.dateTo, mailResult]);
+      d.deliver, d.deliver === 'メール' ? d.custEmail : '', file.getUrl(), file.getId(), hash, d.dateFrom + '〜' + d.dateTo, mailResult, meta.how, meta.note]);
   } catch (e) { warnings.push('契約一覧への記録ができませんでした（' + e.message + '）。PDFは保存済みです'); }
 
   return { fileName: pdfName, url: file.getUrl(), folder: folderPath_(folder), pdfBase64: Utilities.base64Encode(pdf.getBytes()), sha256: hash, signedAt: signedYmd + ' ' + signedHm, warnings: warnings };
 }
+
+// ===== 遠隔署名（お客様がリンクから署名）=====
+// 保留中の契約は 設定フォルダ／遠隔署名（待ち）／<token>.json に置く。署名後は 遠隔署名（記録）へ移す
+function remoteFolder_(name) {
+  var cfg = DriveApp.getFolderById(mustProp_('CONFIG_FOLDER_ID'));
+  var it = cfg.getFoldersByName(name);
+  return it.hasNext() ? it.next() : cfg.createFolder(name);
+}
+function remoteFile_(token) {
+  if (!/^[0-9a-f-]{60,80}$/.test(String(token || ''))) throw new Error('リンクが正しくありません');
+  var it = remoteFolder_(REMOTE_PENDING_FOLDER).getFilesByName(token + '.json');
+  return it.hasNext() ? it.next() : null;
+}
+function remoteRead_(file) { return JSON.parse(file.getBlob().getDataAsString('UTF-8')); }
+function remoteWrite_(file, rec) { file.setContent(JSON.stringify(rec)); }
+function remotePublic_(rec) {
+  // お客様の画面に返す分（担当者の署名画像は返さない）
+  var d = {}; Object.keys(rec.d).forEach(function (k) { if (k !== 'sigStaff') d[k] = rec.d[k]; });
+  return { d: d, exp: rec.exp, status: rec.status, staff: rec.d.staff };
+}
+
+// スタッフ：担当者の署名まで済ませた契約を「待ち」に登録してリンクを作る
+function createRemote(user, d) {
+  d = d || {};
+  precheck_(d, { skipDeliver: true });
+  var sigS = sigBlob_(d.sigStaff, '担当者'); // 形式チェックだけ
+  delete d.sigCustomer;
+  var token = Utilities.getUuid() + '-' + Utilities.getUuid();
+  var now = Date.now();
+  var rec = { token: token, created: now, exp: now + REMOTE_DAYS * 86400000, staffEmail: user.email, status: '未開封', sentTo: '', opened: [], d: d };
+  remoteFolder_(REMOTE_PENDING_FOLDER).createFile(token + '.json', JSON.stringify(rec), 'application/json');
+  return { token: token, url: SIGN_PAGE_URL + '?t=' + token, exp: fmtMs_(rec.exp) };
+}
+
+// スタッフ：リンクをお客様のメールへ送る（LINEは画面の共有ボタンで送る）
+function remoteSendLink(user, token, email) {
+  var file = remoteFile_(token); if (!file) throw new Error('この契約は見つかりません（署名済みか期限切れ）');
+  var rec = remoteRead_(file);
+  email = String(email || rec.d.custEmail || '').trim();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new Error('メールアドレスが正しくありません');
+  var url = SIGN_PAGE_URL + '?t=' + token;
+  var body = rec.d.custName + ' 様\n\n' + COMPANY.name + 'です。作業契約書のご確認とご署名を、下のリンクからお願いいたします。\n\n' + url +
+    '\n\n・リンクは ' + fmtMs_(rec.exp) + ' まで有効です\n・スマートフォンやタブレットで開き、内容を最後までご確認のうえ、画面に指でご署名ください\n・ご不明な点は ' + COMPANY.tel + ' までご連絡ください\n\n' +
+    COMPANY.name + '\n' + COMPANY.address + '\n電話：' + COMPANY.tel + '\nメール：' + COMPANY.email + '\n';
+  var opt = { name: COMPANY.name, replyTo: MAIL_FROM };
+  if (GmailApp.getAliases().indexOf(MAIL_FROM) >= 0) opt.from = MAIL_FROM;
+  GmailApp.sendEmail(email, '【' + COMPANY.name + '】作業契約書のご署名のお願い（' + rec.d.contractNo + '）', body, opt);
+  rec.sentTo = (rec.sentTo ? rec.sentTo + '、' : '') + 'メール ' + email + ' ' + fmtMs_(Date.now());
+  rec.d.custEmail = rec.d.custEmail || email;
+  remoteWrite_(file, rec);
+  return { ok: true };
+}
+
+// スタッフ：待ちの一覧
+function listRemote(user) {
+  var out = [], it = remoteFolder_(REMOTE_PENDING_FOLDER).getFiles();
+  while (it.hasNext()) {
+    var rec = remoteRead_(it.next());
+    out.push({ token: rec.token, url: SIGN_PAGE_URL + '?t=' + rec.token, contractNo: rec.d.contractNo, custName: rec.d.custName, staff: rec.d.staff,
+      created: fmtMs_(rec.created), exp: fmtMs_(rec.exp), expired: rec.exp < Date.now(), status: rec.status, opened: rec.opened.length, sentTo: rec.sentTo, custEmail: rec.d.custEmail || '' });
+  }
+  out.sort(function (a, b) { return a.created < b.created ? 1 : -1; });
+  return { rows: out };
+}
+function cancelRemote(user, token) {
+  var file = remoteFile_(token); if (!file) throw new Error('この契約は見つかりません');
+  var rec = remoteRead_(file); rec.status = '取消'; rec.cancelledBy = user.email; rec.cancelledAt = Date.now();
+  remoteWrite_(file, rec); file.moveTo(remoteFolder_(REMOTE_DONE_FOLDER));
+  return { ok: true };
+}
+
+// お客様：リンクを開く（契約内容＋本文のひな形を返す。開封を記録）
+function remoteGet(token, ua) {
+  var file = remoteFile_(token); if (!file) throw new Error('この契約書は見つかりません。すでに署名済みか、リンクが取り消されています。' + COMPANY.name + '（' + COMPANY.tel + '）へご連絡ください');
+  var rec = remoteRead_(file);
+  if (rec.exp < Date.now()) throw new Error('このリンクの有効期限（' + fmtMs_(rec.exp) + '）が過ぎています。' + COMPANY.name + '（' + COMPANY.tel + '）へご連絡ください');
+  rec.opened.push({ at: Date.now(), ua: String(ua || '').slice(0, 200) });
+  if (rec.status === '未開封') rec.status = '開封済';
+  remoteWrite_(file, rec);
+  var pub = remotePublic_(rec);
+  pub.html = getTemplateHtml(null).html;
+  pub.company = COMPANY;
+  return pub;
+}
+
+// お客様：署名して締結
+function remoteSign(token, sigCustomer, deliver, custEmail, ua) {
+  var lock = LockService.getScriptLock(); lock.waitLock(20000);
+  try {
+    var file = remoteFile_(token); if (!file) throw new Error('この契約書は見つかりません（すでに署名済みの可能性があります）');
+    var rec = remoteRead_(file);
+    if (rec.exp < Date.now()) throw new Error('このリンクの有効期限が過ぎています。' + COMPANY.name + '（' + COMPANY.tel + '）へご連絡ください');
+    var d = rec.d;
+    d.deliver = String(deliver || '');
+    if (d.deliver === 'メール') d.custEmail = String(custEmail || d.custEmail || '').trim();
+    precheck_(d, {});
+    var sigC = sigBlob_(sigCustomer, 'お客様'), sigS = sigBlob_(d.sigStaff, '担当者');
+    var signedAt = Date.now();
+    var note = '送付: ' + (rec.sentTo || '（LINE等で手渡し）') + ' ／ 開封: ' + rec.opened.map(function (o) { return fmtMs_(o.at); }).join(', ') +
+      ' ／ 署名: ' + fmtMs_(signedAt) + ' ／ 端末: ' + String(ua || '').slice(0, 120);
+    var res = finalizeCore_(d, sigC, sigS, { by: rec.staffEmail + '（遠隔）', how: '遠隔', note: note });
+    rec.status = '署名済'; rec.signedAt = signedAt; rec.signedUa = String(ua || '').slice(0, 200); rec.result = { fileName: res.fileName, url: res.url, sha256: res.sha256 };
+    delete rec.d.sigStaff;
+    remoteWrite_(file, rec); file.moveTo(remoteFolder_(REMOTE_DONE_FOLDER));
+    // お客様へは PDF本体（保存・印刷用）と結果だけ返す。ドライブのリンクは返さない
+    return { fileName: res.fileName, pdfBase64: res.pdfBase64, signedAt: res.signedAt, deliver: d.deliver, mailed: d.deliver === 'メール' && !(res.warnings || []).some(function (w) { return w.indexOf('メール') >= 0; }) };
+  } finally { lock.releaseLock(); }
+}
+
+function fmtMs_(ms) { return Utilities.formatDate(new Date(ms), TZ, 'yyyy-MM-dd HH:mm'); }
 
 function payLabel_(d) {
   if (d.payMethod === '振込') return '振込(' + d.payDays + '日)';
@@ -220,6 +347,7 @@ function sheet_() {
   var ss = SpreadsheetApp.openById(mustProp_('SHEET_ID'));
   var sh = ss.getSheetByName('契約一覧') || ss.getSheets()[0];
   if (sh.getLastRow() === 0) { sh.appendRow(SHEET_HEADER); sh.setFrozenRows(1); }
+  else if (sh.getLastColumn() < SHEET_HEADER.length) sh.getRange(1, 1, 1, SHEET_HEADER.length).setValues([SHEET_HEADER]);
   return sh;
 }
 function appendRow_(row) {

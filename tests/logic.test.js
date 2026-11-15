@@ -44,6 +44,11 @@ test('validate required', () => {
   assert.ok(e.some(m => m.includes('作業費')));
   assert.ok(e.some(m => m.includes('受け取り')));
 });
+test('validate skipDeliver (remote)', () => {
+  const d = base(); d.deliver = ''; d.custEmail = '';
+  assert.deepStrictEqual(L.validateContract(d, { skipDeliver: true }), []);
+  assert.ok(L.validateContract(d).some(m => m.includes('受け取り')));
+});
 test('validate conditional', () => {
   let d = base(); d.deliver = 'LINE'; d.custEmail = '';
   assert.deepStrictEqual(L.validateContract(d), []);
