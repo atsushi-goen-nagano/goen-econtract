@@ -23,6 +23,7 @@ var FOLDER_MIME = 'application/vnd.google-apps.folder';
 var REMOTE_DAYS = 7;                                   // 遠隔署名リンクの有効日数
 var REMOTE_PENDING_FOLDER = '遠隔署名（待ち）';
 var REMOTE_DONE_FOLDER = '遠隔署名（記録）';
+var DRAFT_FOLDER = '下書き';
 var SIGN_PAGE_URL = 'https://atsushi-goen-nagano.github.io/goen-econtract/sign.html';
 
 var SHEET_HEADER = ['契約番号', '契約日', '締結日時', '担当者', '作成者', 'お客様名', '作業内容', '作業費', '買取額', '合計', '支払方法', '送付方法', '送付先', 'PDFリンク', 'ファイルID', 'SHA-256', '作業予定日', 'メール送信', '署名方法', '遠隔記録'];
@@ -39,7 +40,8 @@ function doGet() {
 }
 
 var API_FUNCS = { newContract: newContract, getTemplateHtml: getTemplateHtml, finalize: finalize, listContracts: listContracts, whoami: whoami,
-  createRemote: createRemote, listRemote: listRemote, cancelRemote: cancelRemote, remoteSendLink: remoteSendLink };
+  createRemote: createRemote, listRemote: listRemote, cancelRemote: cancelRemote, remoteSendLink: remoteSendLink,
+  saveDraft: saveDraft, listDrafts: listDrafts, getDraft: getDraft, deleteDraft: deleteDraft };
 // お客様側（ログインなし・リンクの合言葉だけで呼べる）
 var PUBLIC_FUNCS = { remoteGet: remoteGet, remoteSign: remoteSign };
 
@@ -139,7 +141,9 @@ function finalize(user, d) {
   d = d || {};
   precheck_(d, {});
   if (!onsiteAllowed(d.contractDate, d.dateFrom)) throw new Error('作業開始日が契約日から' + (ONSITE_MIN_DAYS - 1) + '日以内のため、その場での署名はできません。遠隔署名（お客様がご自身の端末で署名）をお使いください');
-  return finalizeCore_(d, sigBlob_(d.sigCustomer, 'お客様'), sigBlob_(d.sigStaff, '担当者'), { by: user.email, how: '現地', note: '' });
+  var res = finalizeCore_(d, sigBlob_(d.sigCustomer, 'お客様'), sigBlob_(d.sigStaff, '担当者'), { by: user.email, how: '現地', note: '' });
+  deleteDraftQuiet_(d.draftId);
+  return res;
 }
 
 // 入力・担当者・契約番号の重複・ひな形の点検（締結前の共通チェック）
@@ -183,6 +187,44 @@ function finalizeCore_(d, sigC, sigS, meta) {
   return { fileName: pdfName, url: file.getUrl(), folder: folderPath_(folder), pdfBase64: Utilities.base64Encode(pdf.getBytes()), sha256: hash, signedAt: signedYmd + ' ' + signedHm, warnings: warnings };
 }
 
+// ===== 下書き（どの端末からでも再開できるよう裏方にも保存）=====
+// 設定フォルダ／下書き／<draftId>.json。署名画像は含めない。締結・遠隔リンク作成で消す
+function draftFile_(id) {
+  if (!/^[0-9a-zA-Z-]{8,80}$/.test(String(id || ''))) throw new Error('下書きの番号が正しくありません');
+  var it = remoteFolder_(DRAFT_FOLDER).getFilesByName(id + '.json');
+  return it.hasNext() ? it.next() : null;
+}
+function saveDraft(user, draft) {
+  draft = draft || {};
+  var id = String(draft.draftId || '');
+  var d = {}; Object.keys(draft).forEach(function (k) { if (k !== 'sigCustomer' && k !== 'sigStaff') d[k] = draft[k]; });
+  var rec = { id: id, updated: Date.now(), by: user.email, d: d };
+  var file = draftFile_(id);
+  if (file) file.setContent(JSON.stringify(rec)); else remoteFolder_(DRAFT_FOLDER).createFile(id + '.json', JSON.stringify(rec), 'application/json');
+  return { ok: true, updated: fmtMs_(rec.updated) };
+}
+function listDrafts(user) {
+  var out = [], it = remoteFolder_(DRAFT_FOLDER).getFiles();
+  while (it.hasNext()) {
+    try {
+      var rec = JSON.parse(it.next().getBlob().getDataAsString('UTF-8'));
+      out.push({ id: rec.id, updated: fmtMs_(rec.updated), updatedMs: rec.updated, by: rec.by, contractNo: rec.d.contractNo || '', custName: rec.d.custName || '', staff: rec.d.staff || '', dateFrom: rec.d.dateFrom || '' });
+    } catch (e) {}
+  }
+  out.sort(function (a, b) { return b.updatedMs - a.updatedMs; });
+  return { rows: out };
+}
+function getDraft(user, id) {
+  var file = draftFile_(id); if (!file) throw new Error('この下書きは見つかりません（締結済みか削除済み）');
+  var rec = JSON.parse(file.getBlob().getDataAsString('UTF-8'));
+  return { d: rec.d, updated: fmtMs_(rec.updated), by: rec.by };
+}
+function deleteDraft(user, id) {
+  var file = draftFile_(id); if (file) file.setTrashed(true);
+  return { ok: true };
+}
+function deleteDraftQuiet_(id) { try { if (id) deleteDraft(null, id); } catch (e) {} }
+
 // ===== 遠隔署名（お客様がリンクから署名）=====
 // 保留中の契約は 設定フォルダ／遠隔署名（待ち）／<token>.json に置く。署名後は 遠隔署名（記録）へ移す
 function remoteFolder_(name) {
@@ -213,6 +255,7 @@ function createRemote(user, d) {
   var now = Date.now();
   var rec = { token: token, created: now, exp: now + REMOTE_DAYS * 86400000, staffEmail: user.email, status: '未開封', sentTo: '', opened: [], d: d };
   remoteFolder_(REMOTE_PENDING_FOLDER).createFile(token + '.json', JSON.stringify(rec), 'application/json');
+  deleteDraftQuiet_(d.draftId);
   return { token: token, url: SIGN_PAGE_URL + '?t=' + token, exp: fmtMs_(rec.exp) };
 }
 

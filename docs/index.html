@@ -91,8 +91,12 @@
       <h2>はじめる</h2>
       <div id="tplWarn" class="warnbox" hidden></div>
       <button class="btn" id="btnNew">新しい契約書を作る</button>
-      <button class="btn sec" id="btnResume" hidden>入力途中の契約書を再開する</button>
       <button class="btn sec" id="btnList">過去の契約を探す</button>
+    </div>
+    <div class="card" id="draftCard" hidden>
+      <h2>入力途中の契約書</h2>
+      <p class="hint">どの端末からでも再開できます（入力は自動で保存）。</p>
+      <div id="draftList"></div>
     </div>
     <div class="card" id="remoteCard" hidden>
       <h2>遠隔署名 待ち</h2>
@@ -368,8 +372,35 @@ var MOCK = /[?&]mock=1/.test(location.search);                              // �
 
   // ---- ホーム ----
   function goHome(){
-    $('btnResume').hidden = !loadDraft();
-    show('home'); loadRemoteList();
+    show('home'); loadDraftList(); loadRemoteList();
+  }
+  function loadDraftList(){
+    var local = loadDraft();
+    api('listDrafts').then(function(r){
+      var rows = r.rows.slice();
+      if(local && local.draftId && !rows.some(function(x){ return x.id === local.draftId; })){ rows.unshift({ id: local.draftId, updated: 'この端末', by: '', contractNo: local.contractNo, custName: local.custName, staff: local.staff, local: true }); }
+      renderDraftList(rows);
+    }).catch(function(){ renderDraftList(local && local.draftId ? [{ id: local.draftId, updated: 'この端末', by: '', contractNo: local.contractNo, custName: local.custName, staff: local.staff, local: true }] : []); });
+  }
+  function renderDraftList(rows){
+    $('draftCard').hidden = !rows.length;
+    var h = '';
+    rows.forEach(function(x){
+      h += '<div style="border-bottom:1px solid var(--line);padding:10px 0"><b>' + escapeHtml(x.contractNo || '（契約番号なし）') + '</b>　' + escapeHtml(x.custName || '（お名前未入力）') + (x.custName ? ' 様' : '') +
+        '<div class="hint">担当 ' + escapeHtml(x.staff || '') + '／更新 ' + escapeHtml(x.updated) + (x.by ? '（' + escapeHtml(x.by) + '）' : '') + '</div>' +
+        '<div class="row"><button class="btn" style="min-height:44px;font-size:15px;margin-top:8px" data-resume="' + escapeHtml(x.id) + '" data-local="' + (x.local ? '1' : '') + '">再開する</button>' +
+        '<button class="btn sec" style="min-height:44px;font-size:15px;margin-top:8px;color:var(--red);border-color:var(--red)" data-del="' + escapeHtml(x.id) + '">削除</button></div></div>';
+    });
+    $('draftList').innerHTML = h;
+    $('draftList').querySelectorAll('[data-resume]').forEach(function(b){ b.onclick = function(){ resumeDraft(b.dataset.resume, b.dataset.local === '1'); }; });
+    $('draftList').querySelectorAll('[data-del]').forEach(function(b){ b.onclick = function(){ if(!confirm('この下書きを削除しますか？')) return; busy(true); api('deleteDraft', [b.dataset.del]).catch(function(){}).then(function(){ var l = loadDraft(); if(l && l.draftId === b.dataset.del) clearDraft(); busy(false); loadDraftList(); }); }; });
+  }
+  function resumeDraft(id, isLocal){
+    var local = loadDraft();
+    if(local && local.draftId === id){ state.contract = local; fillForm(state.contract); show('form'); if(isLocal) scheduleServerSave(); return; }
+    busy(true, '下書きを読み込んでいます…');
+    api('getDraft', [id]).then(function(r){ busy(false); state.contract = Object.assign(emptyContract('', ''), r.d, { draftId: id }); fillForm(state.contract); saveLocal(); show('form'); })
+      .catch(function(e){ busy(false); alert(e.message); loadDraftList(); });
   }
   function loadRemoteList(){
     api('listRemote').then(function(r){
@@ -387,21 +418,37 @@ var MOCK = /[?&]mock=1/.test(location.search);                              // �
     }).catch(function(){ $('remoteCard').hidden = true; });
   }
   $('btnNew').onclick = function(){
-    if(loadDraft() && !confirm('入力途中の契約書があります。捨てて新しく作りますか？')) return;
     busy(true, '準備しています…');
     api('newContract').then(function(r){
       busy(false);
       state.contract = emptyContract(r.contractNo, r.contractDate);
+      state.contract.draftId = newId();
       fillForm(state.contract); saveDraft(); show('form');
     }).catch(function(e){ busy(false); alert(e.message); });
   };
-  $('btnResume').onclick = function(){ state.contract = loadDraft(); fillForm(state.contract); show('form'); };
   $('btnList').onclick = function(){ openList(); };
 
   // ---- 下書き（端末に保存）----
-  function saveDraft(){ try{ localStorage.setItem('ec_draft', JSON.stringify(state.contract)); }catch(_){} }
+  // 下書き：端末（即時）＋裏方（入力が止まって2秒後）に保存
+  function saveLocal(){ try{ localStorage.setItem('ec_draft', JSON.stringify(state.contract)); }catch(_){} }
+  var saveTimer = null, lastSaved = '';
+  function scheduleServerSave(){
+    if(!state.contract || !state.contract.draftId) return;
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(flushServerSave, 2000);
+  }
+  function flushServerSave(){
+    clearTimeout(saveTimer);
+    if(!state.contract || !state.contract.draftId) return Promise.resolve();
+    var json = JSON.stringify(state.contract);
+    if(json === lastSaved) return Promise.resolve();
+    lastSaved = json;
+    return api('saveDraft', [state.contract]).catch(function(){ lastSaved = ''; });
+  }
+  function saveDraft(){ saveLocal(); scheduleServerSave(); }
+  function newId(){ return Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 10) + '-' + Math.random().toString(36).slice(2, 10); }
   function loadDraft(){ try{ return JSON.parse(localStorage.getItem('ec_draft') || 'null'); }catch(_){ return null; } }
-  function clearDraft(){ try{ localStorage.removeItem('ec_draft'); }catch(_){} }
+  function clearDraft(){ clearTimeout(saveTimer); lastSaved = ''; try{ localStorage.removeItem('ec_draft'); }catch(_){} }
   function emptyContract(no, date){
     return { contractNo:no, contractDate:date, custAddress:'', custName:'', custTel:'', custEmail:'', staff: state.staffList[0] || '',
       works:[], worksOther:'', scope:'', place:'', dateFrom:'', dateTo:'', attend:'', keyKeep:'', keyReturn:'', fee:'', buy:'0', payMethod:'', payDays:'7', payFirstAmount:'', payFirstDate:'', payFirstHow:'', payRestDate:'', payRestHow:'', searchItems:'', deliver:'' };
@@ -468,12 +515,12 @@ var MOCK = /[?&]mock=1/.test(location.search);                              // �
     }).catch(function(){ alert('貼り付けが許可されませんでした。契約番号の欄を長押しして「ペースト」してください。'); });
   };
   $('btnSamePlace').onclick = function(){ $('place').value = $('custAddress').value; readForm(); saveDraft(); };
-  $('btnFormBack').onclick = function(){ readForm(); saveDraft(); goHome(); };
+  $('btnFormBack').onclick = function(){ readForm(); saveLocal(); busy(true, '保存しています…'); flushServerSave().then(function(){ busy(false); goHome(); }); };
   $('btnToConfirm').onclick = function(){
     var c = readForm(); saveDraft();
     var errs = validateContract(c).filter(function(m){ return m.indexOf('受け取り') < 0 && m.indexOf('メールで送るには') < 0; });
     if(errs.length){ showErr('formErr', errs.join('\n')); $('formErr').scrollIntoView({ block:'center' }); return; }
-    showErr('formErr', ''); openConfirm();
+    showErr('formErr', ''); flushServerSave(); openConfirm();
   };
   // Enterで次の欄へ・欄の外に触れたらキーボードを閉じる
   document.addEventListener('touchstart', function(e){
@@ -666,6 +713,11 @@ var MOCK = /[?&]mock=1/.test(location.search);                              // �
     if(fn === 'finalize'){ var c = args[0]; var errs = validateContract(c); if(errs.length) return Promise.reject(new Error(errs.join('\n')));
       return delay({ fileName: c.contractNo + '_' + c.contractDate.replace(/-/g,'') + '.pdf', url:'#', folder:'2026年11月 / 90_その他 / 電子契約書', pdfBase64:'', signedAt:'（練習）', warnings:['練習モードのため保存・送信はしていません'] }); }
     if(fn === 'listRemote') return delay({ rows: window._mockRemote || [] });
+    window._mockDrafts = window._mockDrafts || {};
+    if(fn === 'saveDraft'){ var dd = args[0]; window._mockDrafts[dd.draftId] = { id: dd.draftId, updated: '（練習）', updatedMs: Date.now(), by: 'test@example.com', contractNo: dd.contractNo, custName: dd.custName, staff: dd.staff, d: JSON.parse(JSON.stringify(dd)) }; return delay({ ok:true }); }
+    if(fn === 'listDrafts') return delay({ rows: Object.keys(window._mockDrafts).map(function(k){ return window._mockDrafts[k]; }) });
+    if(fn === 'getDraft'){ var g = window._mockDrafts[args[0]]; return g ? delay({ d: g.d, updated: g.updated, by: g.by }) : Promise.reject(new Error('この下書きは見つかりません')); }
+    if(fn === 'deleteDraft'){ delete window._mockDrafts[args[0]]; return delay({ ok:true }); }
     if(fn === 'createRemote'){ var c2 = args[0]; var errs2 = validateContract(c2, { skipDeliver:true }); if(errs2.length) return Promise.reject(new Error(errs2.join('\n'))); var tk = 'mock-' + Date.now(); window._mockRemote = (window._mockRemote || []).concat([{ token:tk, url: location.origin + location.pathname.replace('index.html','') + 'sign.html?mock=1&t=' + tk, contractNo:c2.contractNo, custName:c2.custName, staff:c2.staff, created:'（練習）', exp:'7日後', expired:false, status:'未開封', opened:0, sentTo:'', custEmail:c2.custEmail }]); return delay({ token:tk, url: window._mockRemote[window._mockRemote.length-1].url, exp:'7日後' }); }
     if(fn === 'remoteSendLink') return delay({ ok:true });
     if(fn === 'cancelRemote'){ window._mockRemote = (window._mockRemote || []).filter(function(x){ return x.token !== args[0]; }); return delay({ ok:true }); }
