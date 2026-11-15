@@ -300,7 +300,7 @@
 </div>
 <div class="overlay" id="overlay">処理中…</div>
 
-<script src="./logic.js?v=20261115b"></script>
+<script src="./logic.js?v=20261115c"></script>
 <script>
 // ===== 設定（初回セットアップで入れる）=====
 var GAS_URL = 'https://script.google.com/macros/s/AKfycbxFGP1CRqhAH9dbwpJjSkbHbq2tyTECBc9Y_Q15oalNBm8Q63W_GEGFuqaiDOcPCsFW/exec';          // GASのウェブアプリURL
@@ -600,9 +600,10 @@ var MOCK = /[?&]mock=1/.test(location.search);                              // �
   // 署名枠：iPhone/iPadの長押し選択・コピーメニュー・ダブルタップ拡大を止める
   document.querySelectorAll('.sigbox').forEach(function(box){
     ['contextmenu','selectstart','touchstart','touchmove','gesturestart'].forEach(function(t){
-      box.addEventListener(t, function(e){ if(t!=='touchstart' && t!=='touchmove') e.preventDefault(); else if(e.touches && e.touches.length>1) e.preventDefault(); if(t==='touchmove') e.preventDefault(); }, { passive:false });
+      box.addEventListener(t, function(e){ e.preventDefault(); }, { passive:false });
     });
   });
+  document.addEventListener('touchstart', function(e){ if(document.body.classList.contains('signing') && e.target.closest && e.target.closest('.sigbox')) e.preventDefault(); }, { passive:false });
   document.addEventListener('selectionchange', function(){
     var sel = window.getSelection && window.getSelection();
     if(sel && sel.rangeCount && document.querySelector('.sigbox') && [].some.call(document.querySelectorAll('.sigbox'), function(b){ return b.contains(sel.anchorNode) || b.contains(sel.focusNode); })) sel.removeAllRanges();
