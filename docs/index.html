@@ -274,8 +274,13 @@
   <section id="s-list" hidden>
     <div class="card">
       <h2>過去の契約</h2>
+      <label class="f">契約を選ぶ <small>（新しい順・最近200件）</small></label>
+      <select id="pickContract"><option value="">読み込み中…</option></select>
+      <div id="pickDetail" class="warnbox" hidden></div>
+      <a class="btn" id="btnPickPdf" target="_blank" rel="noopener" hidden style="text-decoration:none;display:flex;align-items:center;justify-content:center">この契約のPDFを開く</a>
+      <h3 style="margin-top:22px">条件で絞り込む</h3>
       <div class="row">
-        <div><label class="f">契約番号</label><input type="text" id="qNo" placeholder="GOEN-2026…"></div>
+        <div><label class="f">契約番号</label><input type="text" id="qNo" placeholder="26-0152"></div>
         <div><label class="f">担当者</label><select id="qStaff"><option value="">すべて</option></select></div>
       </div>
       <div class="row">
@@ -687,7 +692,26 @@ var MOCK = /[?&]mock=1/.test(location.search);                              // �
   $('btnDoneHome').onclick = function(){ state.contract = null; state.pdfBlob = null; goHome(); };
 
   // ---- 一覧 ----
-  function openList(){ $('qNameWrap').hidden = !(state.user && state.user.isAdmin); $('listOut').innerHTML = ''; show('list'); }
+  var pickRows = [];
+  function openList(){
+    $('qNameWrap').hidden = !(state.user && state.user.isAdmin); $('listOut').innerHTML = ''; $('pickDetail').hidden = true; $('btnPickPdf').hidden = true;
+    show('list');
+    $('pickContract').innerHTML = '<option value="">読み込み中…</option>';
+    api('listContracts', [{}]).then(function(r){
+      pickRows = r.rows;
+      var h = '<option value="">— 契約を選んでください —</option>';
+      r.rows.forEach(function(x, i){ h += '<option value="' + i + '">' + escapeHtml(x.contractNo + '　' + x.contractDate + (x.custName ? '　' + x.custName + ' 様' : '') + '　' + x.staff) + '</option>'; });
+      if(!r.rows.length) h = '<option value="">まだ契約がありません</option>';
+      $('pickContract').innerHTML = h;
+    }).catch(function(e){ $('pickContract').innerHTML = '<option value="">読み込めませんでした</option>'; showErr('listErr', e.message); });
+  }
+  $('pickContract').addEventListener('change', function(){
+    var x = pickRows[Number($('pickContract').value)];
+    $('pickDetail').hidden = !x; $('btnPickPdf').hidden = !x;
+    if(!x) return;
+    $('pickDetail').textContent = '契約番号 ' + x.contractNo + '　契約日 ' + x.contractDate + '　締結 ' + x.signedAt + '\n担当 ' + x.staff + (x.custName ? '　お客様 ' + x.custName + ' 様' : '') + '\n' + x.works + '　合計 ' + yen(x.total) + ' 円　控え：' + x.deliver;
+    $('btnPickPdf').href = x.url || '#';
+  });
   $('btnListBack').onclick = goHome;
   $('btnSearch').onclick = function(){
     var q = { no:$('qNo').value.trim(), from:$('qFrom').value, to:$('qTo').value, staff:$('qStaff').value, name:$('qName').value.trim() };
