@@ -33,6 +33,15 @@ test('calcTotal / monthPrefix / caseNo', () => {
   assert.ok(L.validateContract(Object.assign(base(), { contractNo: 'abc' })).some(x => x.includes('26-0152')));
   assert.strictEqual(L.validateContract(Object.assign(base(), { contractNo: '２６-０１５２' })).length, 0);
 });
+test('onsite vs remote by days', () => {
+  assert.strictEqual(L.daysUntilWork('2026-11-15', '2026-11-16'), 1);
+  assert.strictEqual(L.daysUntilWork('2026-11-15', '2026-11-23'), 8);
+  assert.strictEqual(L.daysUntilWork('2026-11-15', ''), null);
+  assert.strictEqual(L.ONSITE_MIN_DAYS, 8);
+  assert.strictEqual(L.onsiteAllowed('2026-11-15', '2026-11-22'), false); // 7日後 → 遠隔のみ
+  assert.strictEqual(L.onsiteAllowed('2026-11-15', '2026-11-23'), true);  // 8日後 → どちらも可
+  assert.strictEqual(L.onsiteAllowed('2026-11-15', ''), false);
+});
 test('validate ok', () => {
   assert.deepStrictEqual(L.validateContract(base()), []);
 });

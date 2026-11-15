@@ -138,6 +138,7 @@ function getTemplateHtml(user) {
 function finalize(user, d) {
   d = d || {};
   precheck_(d, {});
+  if (!onsiteAllowed(d.contractDate, d.dateFrom)) throw new Error('作業開始日が契約日から' + (ONSITE_MIN_DAYS - 1) + '日以内のため、その場での署名はできません。遠隔署名（お客様がご自身の端末で署名）をお使いください');
   return finalizeCore_(d, sigBlob_(d.sigCustomer, 'お客様'), sigBlob_(d.sigStaff, '担当者'), { by: user.email, how: '現地', note: '' });
 }
 
@@ -279,7 +280,7 @@ function remoteSign(token, sigCustomer, deliver, custEmail, ua) {
     precheck_(d, {});
     var sigC = sigBlob_(sigCustomer, 'お客様'), sigS = sigBlob_(d.sigStaff, '担当者');
     var signedAt = Date.now();
-    var note = '送付: ' + (rec.sentTo || '（LINE等で手渡し）') + ' ／ 開封: ' + rec.opened.map(function (o) { return fmtMs_(o.at); }).join(', ') +
+    var note = 'お客様がご自身の端末から署名（訪問先ではない） ／ 送付: ' + (rec.sentTo || '（LINE等で手渡し）') + ' ／ 開封: ' + rec.opened.map(function (o) { return fmtMs_(o.at); }).join(', ') +
       ' ／ 署名: ' + fmtMs_(signedAt) + ' ／ 端末: ' + String(ua || '').slice(0, 120);
     var res = finalizeCore_(d, sigC, sigS, { by: rec.staffEmail + '（遠隔）', how: '遠隔', note: note });
     rec.status = '署名済'; rec.signedAt = signedAt; rec.signedUa = String(ua || '').slice(0, 200); rec.result = { fileName: res.fileName, url: res.url, sha256: res.sha256 };

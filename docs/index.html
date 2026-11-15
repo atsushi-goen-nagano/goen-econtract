@@ -188,7 +188,9 @@
   <!-- 受け取り方法 -->
   <section id="s-deliver" hidden>
     <div class="card">
-      <h2>3. 控えの受け取り方法</h2>
+      <h2>3. 署名の方法と控えの受け取り</h2>
+      <div id="onsiteBlock" class="err" hidden></div>
+      <div id="onsiteOk" class="hint" hidden></div>
       <p>契約書の控え（PDF）をどの方法で受け取りますか？</p>
       <div class="chips" data-group="deliver" style="flex-direction:column">
         <button class="chip" data-v="LINE">LINEで受け取る</button>
@@ -505,7 +507,20 @@ var MOCK = /[?&]mock=1/.test(location.search);                              // �
   function checkGate(){ var b = $('docbox'); if(b.scrollTop + b.clientHeight >= b.scrollHeight - 24) setGate(true); }
   $('docbox').addEventListener('scroll', checkGate);
   $('btnConfirmBack').onclick = function(){ show('form'); };
-  $('btnToDeliver').onclick = function(){ $('custEmail2').value = state.contract.custEmail; renderChips(); show('deliver'); };
+  $('btnToDeliver').onclick = function(){ $('custEmail2').value = state.contract.custEmail; renderChips(); applyOnsiteRule(); show('deliver'); };
+  // 二段構え：作業開始日が契約日から近い（ONSITE_MIN_DAYS未満）ならその場署名を止め、遠隔署名だけにする
+  function applyOnsiteRule(){
+    var c = state.contract, n = daysUntilWork(c.contractDate, c.dateFrom), ok = onsiteAllowed(c.contractDate, c.dateFrom);
+    $('onsiteBlock').hidden = ok; $('onsiteOk').hidden = !ok;
+    if(!ok){
+      $('onsiteBlock').textContent = '作業開始日が契約日から' + (n === null ? '？' : n) + '日後で近いため、その場での署名はできません（クーリングオフ期間内に作業が始まるため）。\n下の「遠隔署名」でリンクを送り、お客様にご自宅の端末から署名してもらってください。';
+    } else {
+      $('onsiteOk').textContent = '作業開始日は契約日の ' + n + ' 日後です。その場での署名ができます（遠隔署名も選べます）。';
+    }
+    Array.prototype.forEach.call(document.querySelector('[data-group=deliver]').children, function(b){ b.disabled = !ok; b.style.opacity = ok ? '' : '.4'; });
+    $('deliverEmailWrap').hidden = !ok || c.deliver !== 'メール';
+    $('btnToSign').disabled = !ok;
+  }
 
   // ---- 受け取り方法 ----
   $('custEmail2').addEventListener('input', function(){ state.contract.custEmail = $('custEmail2').value.trim(); $('custEmail').value = state.contract.custEmail; saveDraft(); });
@@ -516,6 +531,7 @@ var MOCK = /[?&]mock=1/.test(location.search);                              // �
     showErr('deliverErr', ''); remoteMode = true; $('signStaffName').textContent = state.contract.staff; show('sign');
   };
   $('btnToSign').onclick = function(){
+    if(!onsiteAllowed(state.contract.contractDate, state.contract.dateFrom)){ applyOnsiteRule(); return; }
     var errs = validateContract(state.contract);
     if(errs.length){ showErr('deliverErr', errs.join('\n')); return; }
     showErr('deliverErr', ''); remoteMode = false; $('signStaffName').textContent = state.contract.staff; show('sign');

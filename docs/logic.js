@@ -3,6 +3,11 @@
 
 var COMPANY_TEL = '026-405-8085';
 
+// 現地（その場）署名ができる最低日数：契約日から作業開始日までの差（日）。
+// クーリングオフ8日間（書面受領日を1日目と数える）に作業が重ならないための基準。
+// 行政書士の確認で「9」にする場合はここだけ変える（画面・GASの両方に効く）。
+var ONSITE_MIN_DAYS = 8;
+
 var WORK_KEYS = ['遺品整理', '家財整理', '特殊清掃', '消臭・除菌', '空き家片付け', 'ゴミ屋敷清掃', 'その他'];
 var PAY_KEYS = { '現金': '支払現金', '振込': '支払振込', '2回': '支払2回' };
 var HOW_KEYS = ['現金', '振込'];
@@ -61,6 +66,18 @@ function normalizeCaseNo(s) {
   return String(s == null ? '' : s).trim()
     .replace(/[０-９]/g, function (ch) { return String.fromCharCode(ch.charCodeAt(0) - 0xFEE0); })
     .replace(/[‐－―ー−‒–—]/g, '-').replace(/\s+/g, '');
+}
+
+// 契約日→作業開始日の日数差（どちらか読めなければ null）
+function daysUntilWork(contractDate, dateFrom) {
+  var a = parseYmd(contractDate), b = parseYmd(dateFrom);
+  if (!a || !b) return null;
+  return Math.round((Date.UTC(b.y, b.m - 1, b.d) - Date.UTC(a.y, a.m - 1, a.d)) / 86400000);
+}
+// その場で署名してよいか（作業開始日が近いときは遠隔署名のみ）
+function onsiteAllowed(contractDate, dateFrom) {
+  var n = daysUntilWork(contractDate, dateFrom);
+  return n !== null && n >= ONSITE_MIN_DAYS;
 }
 
 function isInt_(v) { return /^-?\d+$/.test(String(v).trim()); }
@@ -160,5 +177,5 @@ function buildReplaceMap(d, signedYmd, signedHm) {
 
 // Nodeのテストから読めるようにする（GASではこの行は何もしない）
 if (typeof module !== 'undefined') {
-  module.exports = { COMPANY_TEL: COMPANY_TEL, WORK_KEYS: WORK_KEYS, HOW_KEYS: HOW_KEYS, PLACEHOLDERS: PLACEHOLDERS, parseYmd: parseYmd, wareki: wareki, yen: yen, calcTotal: calcTotal, monthPrefix: monthPrefix, CASE_NO_RE: CASE_NO_RE, normalizeCaseNo: normalizeCaseNo, validateContract: validateContract, buildReplaceMap: buildReplaceMap };
+  module.exports = { COMPANY_TEL: COMPANY_TEL, WORK_KEYS: WORK_KEYS, HOW_KEYS: HOW_KEYS, PLACEHOLDERS: PLACEHOLDERS, parseYmd: parseYmd, wareki: wareki, yen: yen, calcTotal: calcTotal, monthPrefix: monthPrefix, ONSITE_MIN_DAYS: ONSITE_MIN_DAYS, daysUntilWork: daysUntilWork, onsiteAllowed: onsiteAllowed, CASE_NO_RE: CASE_NO_RE, normalizeCaseNo: normalizeCaseNo, validateContract: validateContract, buildReplaceMap: buildReplaceMap };
 }
