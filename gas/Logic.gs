@@ -98,9 +98,12 @@ function validateContract(d, opts) {
   if (!no) e.push('契約番号（写真アプリの案件番号）を入力してください');
   else if (!CASE_NO_RE.test(no)) e.push('契約番号は写真アプリの案件番号の形（例 26-0152）で入力してください');
   if (!parseYmd(d.contractDate)) e.push('契約日を入力してください');
-  need('custAddress', 'お客様のご住所');
-  need('custName', 'お客様のお名前');
-  need('custTel', 'お客様の電話番号');
+  // 遠隔署名ではお客様ご自身がリンク先で入力するので、スタッフ側では空でよい（opts.skipCustomer）
+  if (!opts.skipCustomer) {
+    need('custAddress', 'お客様のご住所');
+    need('custName', 'お客様のお名前');
+    need('custTel', 'お客様の電話番号');
+  }
   need('staff', 'GOEN担当者');
   var works = Array.isArray(d.works) ? d.works : [];
   if (!works.length) e.push('作業内容を1つ以上選んでください');

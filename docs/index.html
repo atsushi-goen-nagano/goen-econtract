@@ -121,6 +121,8 @@
       </div>
 
       <h3>お客様（甲）</h3>
+      <button class="chip" id="btnCustSelf" style="width:100%;text-align:left">☐ 遠隔署名で、お客様ご自身に入力してもらう（住所・お名前・電話）</button>
+      <p class="hint" id="custSelfHint" hidden>下の3つは空欄のままで進めます。分かっている分を入れておくと、お客様の画面に最初から入った状態で表示され、ご本人が確認・修正できます。この契約は遠隔署名のみになります。</p>
       <label class="f">ご住所<span class="req">必須</span></label><input type="text" id="custAddress" autocomplete="off">
       <label class="f">お名前<span class="req">必須</span></label><input type="text" id="custName" autocomplete="off">
       <label class="f">電話番号<span class="req">必須</span></label><input type="tel" id="custTel" autocomplete="off">
@@ -300,7 +302,7 @@
 </div>
 <div class="overlay" id="overlay">処理中…</div>
 
-<script src="./logic.js?v=20261115c"></script>
+<script src="./logic.js?v=20261121a"></script>
 <script>
 // ===== 設定（初回セットアップで入れる）=====
 var GAS_URL = 'https://script.google.com/macros/s/AKfycbxFGP1CRqhAH9dbwpJjSkbHbq2tyTECBc9Y_Q15oalNBm8Q63W_GEGFuqaiDOcPCsFW/exec';          // GASのウェブアプリURL
@@ -416,7 +418,7 @@ var MOCK = /[?&]mock=1/.test(location.search);                              // �
       $('remoteCard').hidden = !r.rows.length;
       var h = '';
       r.rows.forEach(function(x){
-        h += '<div style="border-bottom:1px solid var(--line);padding:10px 0"><b>' + escapeHtml(x.contractNo) + '</b>　' + escapeHtml(x.custName) + ' 様　<span class="pill">' + escapeHtml(x.expired ? '期限切れ' : x.status) + '</span>' +
+        h += '<div style="border-bottom:1px solid var(--line);padding:10px 0"><b>' + escapeHtml(x.contractNo) + '</b>　' + escapeHtml(x.custName ? x.custName + ' 様' : 'お客様（ご本人が入力）') + '　<span class="pill">' + escapeHtml(x.expired ? '期限切れ' : x.status) + '</span>' +
           '<div class="hint">担当 ' + escapeHtml(x.staff) + '／作成 ' + escapeHtml(x.created) + '／期限 ' + escapeHtml(x.exp) + (x.sentTo ? '／送付 ' + escapeHtml(x.sentTo) : '') + '</div>' +
           '<div class="row"><button class="btn sec" style="min-height:44px;font-size:15px;margin-top:8px" data-reshare="' + escapeHtml(x.token) + '">リンクを再送</button>' +
           '<button class="btn sec" style="min-height:44px;font-size:15px;margin-top:8px;color:var(--red);border-color:var(--red)" data-cancel="' + escapeHtml(x.token) + '">取り消す</button></div></div>';
@@ -460,7 +462,7 @@ var MOCK = /[?&]mock=1/.test(location.search);                              // �
   function clearDraft(){ clearTimeout(saveTimer); lastSaved = ''; try{ localStorage.removeItem('ec_draft'); }catch(_){} }
   function emptyContract(no, date){
     return { contractNo:no, contractDate:date, custAddress:'', custName:'', custTel:'', custEmail:'', staff: state.staffList[0] || '',
-      works:[], worksOther:'', scope:'', place:'', dateFrom:'', dateTo:'', attend:'', keyKeep:'', keyReturn:'', fee:'', buy:'0', payMethod:'', payDays:'7', payFirstAmount:'', payFirstDate:'', payFirstHow:'', payRestDate:'', payRestHow:'', searchItems:'', deliver:'' };
+      works:[], worksOther:'', scope:'', place:'', dateFrom:'', dateTo:'', attend:'', keyKeep:'', keyReturn:'', fee:'', buy:'0', payMethod:'', payDays:'7', payFirstAmount:'', custSelf:false, payFirstDate:'', payFirstHow:'', payRestDate:'', payRestHow:'', searchItems:'', deliver:'' };
   }
 
   // ---- 入力画面 ----
@@ -491,6 +493,7 @@ var MOCK = /[?&]mock=1/.test(location.search);                              // �
     var c = state.contract;
     Array.prototype.forEach.call($('works').children, function(b){ b.classList.toggle('on', c.works.indexOf(b.dataset.v) >= 0); });
     $('worksOtherWrap').hidden = c.works.indexOf('その他') < 0;
+    $('btnCustSelf').classList.toggle('on', !!c.custSelf); $('btnCustSelf').textContent = (c.custSelf ? '☑' : '☐') + ' 遠隔署名で、お客様ご自身に入力してもらう（住所・お名前・電話）'; $('custSelfHint').hidden = !c.custSelf;
     document.querySelectorAll('[data-group]').forEach(function(g){
       var key = g.dataset.group;
       Array.prototype.forEach.call(g.children, function(b){ b.classList.toggle('on', c[key] === b.dataset.v); });
@@ -541,11 +544,12 @@ var MOCK = /[?&]mock=1/.test(location.search);                              // �
   }
   $('btnLookup').onclick = function(){ readForm(); lookupCase('', true); };
   $('contractNo').addEventListener('change', function(){ var no = normalizeCaseNo($('contractNo').value); if(CASE_NO_RE.test(no) && !state.contract.custName && !state.contract.custTel) lookupCase(no, false); });
+  $('btnCustSelf').onclick = function(){ state.contract.custSelf = !state.contract.custSelf; renderChips(); saveDraft(); };
   $('btnSamePlace').onclick = function(){ $('place').value = $('custAddress').value; readForm(); saveDraft(); };
   $('btnFormBack').onclick = function(){ readForm(); saveLocal(); busy(true, '保存しています…'); flushServerSave().then(function(){ busy(false); goHome(); }); };
   $('btnToConfirm').onclick = function(){
     var c = readForm(); saveDraft();
-    var errs = validateContract(c).filter(function(m){ return m.indexOf('受け取り') < 0 && m.indexOf('メールで送るには') < 0; });
+    var errs = validateContract(c, { skipCustomer: !!c.custSelf }).filter(function(m){ return m.indexOf('受け取り') < 0 && m.indexOf('メールで送るには') < 0; });
     if(errs.length){ showErr('formErr', errs.join('\n')); $('formErr').scrollIntoView({ block:'center' }); return; }
     showErr('formErr', ''); flushServerSave(); openConfirm();
   };
@@ -570,6 +574,7 @@ var MOCK = /[?&]mock=1/.test(location.search);                              // �
       busy(false);
       html = normalizeTemplateHtml(html);
       var map = buildReplaceMap(state.contract, state.contract.contractDate, '');
+      [['《甲住所》','custAddress'],['《甲氏名》','custName'],['《甲電話》','custTel']].forEach(function(p){ if(!String(state.contract[p[1]] || '').trim()) map[p[0]] = '（お客様がご自身で入力）'; });
       map['《甲署名日》'] = '（締結時に記録）'; map['《乙署名日》'] = '（締結時に記録）';
       if(!state.contract.deliver){ ['LINE','メール','紙'].forEach(function(k){ map['《チェック:受取'+k+'》'] = '☐'; }); map['《承諾メール》'] = '（次の画面で選択）'; }
       Object.keys(map).forEach(function(k){ html = html.split(k).join(escapeHtml(map[k])); });
@@ -587,9 +592,11 @@ var MOCK = /[?&]mock=1/.test(location.search);                              // �
   $('btnToDeliver').onclick = function(){ $('custEmail2').value = state.contract.custEmail; renderChips(); applyOnsiteRule(); show('deliver'); };
   // 二段構え：作業開始日が契約日から近い（ONSITE_MIN_DAYS未満）ならその場署名を止め、遠隔署名だけにする
   function applyOnsiteRule(){
-    var c = state.contract, n = daysUntilWork(c.contractDate, c.dateFrom), ok = onsiteAllowed(c.contractDate, c.dateFrom);
+    var c = state.contract, n = daysUntilWork(c.contractDate, c.dateFrom), ok = onsiteAllowed(c.contractDate, c.dateFrom) && !c.custSelf;
     $('onsiteBlock').hidden = ok; $('onsiteOk').hidden = !ok;
-    if(!ok){
+    if(c.custSelf){
+      $('onsiteBlock').textContent = '「お客様ご自身に入力してもらう」を選んでいるため、遠隔署名のみです。\n下の「遠隔署名」でリンクを送ってください。お客様がリンク先で住所・お名前・電話番号を入力してから署名します。';
+    } else if(!ok){
       $('onsiteBlock').textContent = '作業開始日が契約日から' + (n === null ? '？' : n) + '日後で近いため、その場での署名はできません（クーリングオフ期間内に作業が始まるため）。\n下の「遠隔署名」でリンクを送り、お客様にご自宅の端末から署名してもらってください。';
     } else {
       $('onsiteOk').textContent = '作業開始日は契約日の ' + n + ' 日後です。その場での署名ができます（遠隔署名も選べます）。';
@@ -603,7 +610,7 @@ var MOCK = /[?&]mock=1/.test(location.search);                              // �
   $('custEmail2').addEventListener('input', function(){ state.contract.custEmail = $('custEmail2').value.trim(); $('custEmail').value = state.contract.custEmail; saveDraft(); });
   $('btnDeliverBack').onclick = function(){ openConfirm(); };
   $('btnRemote').onclick = function(){
-    var errs = validateContract(state.contract, { skipDeliver: true });
+    var errs = validateContract(state.contract, { skipDeliver: true, skipCustomer: true }); // お客様情報はリンク先でご本人が入力・確認
     if(errs.length){ showErr('deliverErr', errs.join('\n')); return; }
     showErr('deliverErr', ''); remoteMode = true; $('signStaffName').textContent = state.contract.staff; show('sign');
   };
@@ -681,11 +688,11 @@ var MOCK = /[?&]mock=1/.test(location.search);                              // �
   };
   function showRemote(r, c){
     remote = { url:r.url, token:r.token, exp:r.exp, custName:c.custName, custEmail:c.custEmail || '', contractNo:c.contractNo };
-    $('remoteWho').textContent = c.custName + ' 様（契約番号 ' + c.contractNo + '）に、このリンクを送ってください。';
+    $('remoteWho').textContent = (c.custName ? c.custName + ' 様' : 'お客様') + '（契約番号 ' + c.contractNo + '）に、このリンクを送ってください。';
     $('remoteUrl').textContent = r.url; $('remoteExp').textContent = r.exp;
     showErr('remoteErr', ''); $('remoteOk').hidden = true; show('remote');
   }
-  function remoteText(){ return remote.custName + ' 様\n株式会社GOENです。作業契約書のご確認とご署名を下のリンクからお願いいたします（' + remote.exp + ' まで有効）。\n' + remote.url; }
+  function remoteText(){ return (remote.custName ? remote.custName + ' 様' : 'お客様') + '\n株式会社GOENです。作業契約書のご確認とご署名を下のリンクからお願いいたします（' + remote.exp + ' まで有効）。\n' + remote.url; }
   $('btnRemoteLine').onclick = function(){
     if(navigator.share) navigator.share({ title:'作業契約書のご署名のお願い', text: remoteText() }).catch(function(){});
     else { copyText(remoteText()); alert('文面をコピーしました。LINEに貼り付けて送ってください。'); }
@@ -777,7 +784,7 @@ var MOCK = /[?&]mock=1/.test(location.search);                              // �
     if(fn === 'listDrafts') return delay({ rows: Object.keys(window._mockDrafts).map(function(k){ return window._mockDrafts[k]; }) });
     if(fn === 'getDraft'){ var g = window._mockDrafts[args[0]]; return g ? delay({ d: g.d, updated: g.updated, by: g.by }) : Promise.reject(new Error('この下書きは見つかりません')); }
     if(fn === 'deleteDraft'){ delete window._mockDrafts[args[0]]; return delay({ ok:true }); }
-    if(fn === 'createRemote'){ var c2 = args[0]; var errs2 = validateContract(c2, { skipDeliver:true }); if(errs2.length) return Promise.reject(new Error(errs2.join('\n'))); var tk = 'mock-' + Date.now(); window._mockRemote = (window._mockRemote || []).concat([{ token:tk, url: location.origin + location.pathname.replace('index.html','') + 'sign.html?mock=1&t=' + tk, contractNo:c2.contractNo, custName:c2.custName, staff:c2.staff, created:'（練習）', exp:'7日後', expired:false, status:'未開封', opened:0, sentTo:'', custEmail:c2.custEmail }]); return delay({ token:tk, url: window._mockRemote[window._mockRemote.length-1].url, exp:'7日後' }); }
+    if(fn === 'createRemote'){ var c2 = args[0]; var errs2 = validateContract(c2, { skipDeliver:true, skipCustomer:true }); if(errs2.length) return Promise.reject(new Error(errs2.join('\n'))); var tk = 'mock-' + Date.now(); window._mockRemote = (window._mockRemote || []).concat([{ token:tk, url: location.origin + location.pathname.replace('index.html','') + 'sign.html?mock=1&t=' + tk, contractNo:c2.contractNo, custName:c2.custName, staff:c2.staff, created:'（練習）', exp:'7日後', expired:false, status:'未開封', opened:0, sentTo:'', custEmail:c2.custEmail }]); return delay({ token:tk, url: window._mockRemote[window._mockRemote.length-1].url, exp:'7日後' }); }
     if(fn === 'remoteSendLink') return delay({ ok:true });
     if(fn === 'cancelRemote'){ window._mockRemote = (window._mockRemote || []).filter(function(x){ return x.token !== args[0]; }); return delay({ ok:true }); }
     if(fn === 'listContracts') return delay({ isAdmin:true, rows:[{ contractNo:'26-0152', contractDate:'2026-11-01', signedAt:'2026-11-01 14:05', staff:'小口（代表）', custName:'テスト 太郎', works:'遺品整理', total:220000, deliver:'メール', url:'#' }] });

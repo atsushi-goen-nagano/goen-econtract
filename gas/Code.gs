@@ -276,7 +276,7 @@ function remotePublic_(rec) {
 // スタッフ：担当者の署名まで済ませた契約を「待ち」に登録してリンクを作る
 function createRemote(user, d) {
   d = d || {};
-  precheck_(d, { skipDeliver: true });
+  precheck_(d, { skipDeliver: true, skipCustomer: true }); // お客様の住所・氏名・電話はリンク先でご本人が入力／確認する
   var sigS = sigBlob_(d.sigStaff, '担当者'); // 形式チェックだけ
   delete d.sigCustomer;
   var token = Utilities.getUuid() + '-' + Utilities.getUuid();
@@ -294,8 +294,8 @@ function remoteSendLink(user, token, email) {
   email = String(email || rec.d.custEmail || '').trim();
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new Error('メールアドレスが正しくありません');
   var url = SIGN_PAGE_URL + '?t=' + token;
-  var body = rec.d.custName + ' 様\n\n' + COMPANY.name + 'です。作業契約書のご確認とご署名を、下のリンクからお願いいたします。\n\n' + url +
-    '\n\n・リンクは ' + fmtMs_(rec.exp) + ' まで有効です\n・スマートフォンやタブレットで開き、内容を最後までご確認のうえ、画面に指でご署名ください\n・ご不明な点は ' + COMPANY.tel + ' までご連絡ください\n\n' +
+  var body = (rec.d.custName ? rec.d.custName + ' 様' : 'お客様') + '\n\n' + COMPANY.name + 'です。作業契約書のご確認とご署名を、下のリンクからお願いいたします。\n\n' + url +
+    '\n\n・リンクは ' + fmtMs_(rec.exp) + ' まで有効です\n・スマートフォンやタブレットで開き、ご住所・お名前・お電話番号をご入力のうえ、内容を最後までご確認いただき、画面に指でご署名ください\n・ご不明な点は ' + COMPANY.tel + ' までご連絡ください\n\n' +
     COMPANY.name + '\n' + COMPANY.address + '\n電話：' + COMPANY.tel + '\nメール：' + COMPANY.email + '\n';
   var opt = { name: COMPANY.name, replyTo: MAIL_FROM };
   if (GmailApp.getAliases().indexOf(MAIL_FROM) >= 0) opt.from = MAIL_FROM;
@@ -339,19 +339,29 @@ function remoteGet(token, ua) {
 }
 
 // お客様：署名して締結
-function remoteSign(token, sigCustomer, deliver, custEmail, ua) {
+function remoteSign(token, sigCustomer, deliver, custEmail, ua, cust) {
   var lock = LockService.getScriptLock(); lock.waitLock(20000);
   try {
     var file = remoteFile_(token); if (!file) throw new Error('この契約書は見つかりません（すでに署名済みの可能性があります）');
     var rec = remoteRead_(file);
     if (rec.exp < Date.now()) throw new Error('このリンクの有効期限が過ぎています。' + COMPANY.name + '（' + COMPANY.tel + '）へご連絡ください');
     var d = rec.d;
+    // お客様ご自身が入力した住所・氏名・電話（スタッフが入れていた値と違えば記録に残す）
+    var selfNote = '';
+    if (cust && typeof cust === 'object') {
+      var changed = [];
+      [['custAddress', 300, '住所'], ['custName', 80, '氏名'], ['custTel', 30, '電話']].forEach(function (f) {
+        var v = String(cust[f[0]] == null ? '' : cust[f[0]]).trim().slice(0, f[1]);
+        if (v && v !== String(d[f[0]] || '').trim()) { changed.push(f[2]); d[f[0]] = v; }
+      });
+      selfNote = 'お客様情報はご本人が入力・確認' + (changed.length ? '（入力/修正: ' + changed.join('・') + '）' : '（修正なし）') + ' ／ ';
+    }
     d.deliver = String(deliver || '');
     if (d.deliver === 'メール') d.custEmail = String(custEmail || d.custEmail || '').trim();
     precheck_(d, {});
     var sigC = sigBlob_(sigCustomer, 'お客様'), sigS = sigBlob_(d.sigStaff, '担当者');
     var signedAt = Date.now();
-    var note = 'お客様がご自身の端末から署名（訪問先ではない） ／ 送付: ' + (rec.sentTo || '（LINE等で手渡し）') + ' ／ 開封: ' + rec.opened.map(function (o) { return fmtMs_(o.at); }).join(', ') +
+    var note = 'お客様がご自身の端末から署名（訪問先ではない） ／ ' + selfNote + '送付: ' + (rec.sentTo || '（LINE等で手渡し）') + ' ／ 開封: ' + rec.opened.map(function (o) { return fmtMs_(o.at); }).join(', ') +
       ' ／ 署名: ' + fmtMs_(signedAt) + ' ／ 端末: ' + String(ua || '').slice(0, 120);
     var res = finalizeCore_(d, sigC, sigS, { by: rec.staffEmail + '（遠隔）', how: '遠隔', note: note });
     rec.status = '署名済'; rec.signedAt = signedAt; rec.signedUa = String(ua || '').slice(0, 200); rec.result = { fileName: res.fileName, url: res.url, sha256: res.sha256 };

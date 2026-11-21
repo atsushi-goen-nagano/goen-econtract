@@ -67,6 +67,12 @@ test('validate skipDeliver (remote)', () => {
   assert.deepStrictEqual(L.validateContract(d, { skipDeliver: true }), []);
   assert.ok(L.validateContract(d).some(m => m.includes('受け取り')));
 });
+test('validate skipCustomer (customer fills in on remote page)', () => {
+  const d = base(); d.custAddress = ''; d.custName = ''; d.custTel = ''; d.deliver = '';
+  assert.deepStrictEqual(L.validateContract(d, { skipDeliver: true, skipCustomer: true }), []);
+  const e = L.validateContract(d, { skipDeliver: true });
+  assert.ok(e.some(m => m.includes('ご住所')) && e.some(m => m.includes('お名前')) && e.some(m => m.includes('電話番号')));
+});
 test('validate conditional', () => {
   let d = base(); d.deliver = 'LINE'; d.custEmail = '';
   assert.deepStrictEqual(L.validateContract(d), []);
