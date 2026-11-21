@@ -43,7 +43,7 @@ function doGet() {
 
 var API_FUNCS = { newContract: newContract, getTemplateHtml: getTemplateHtml, finalize: finalize, listContracts: listContracts, whoami: whoami,
   createRemote: createRemote, listRemote: listRemote, cancelRemote: cancelRemote, remoteSendLink: remoteSendLink,
-  saveDraft: saveDraft, listDrafts: listDrafts, getDraft: getDraft, deleteDraft: deleteDraft, lookupCase: lookupCase };
+  saveDraft: saveDraft, listDrafts: listDrafts, getDraft: getDraft, deleteDraft: deleteDraft, lookupCase: lookupCase, listEstimateCases: listEstimateCases };
 // お客様側（ログインなし・リンクの合言葉だけで呼べる）
 var PUBLIC_FUNCS = { remoteGet: remoteGet, remoteSign: remoteSign };
 
@@ -187,6 +187,24 @@ function finalizeCore_(d, sigC, sigS, meta) {
   } catch (e) { warnings.push('契約一覧への記録ができませんでした（' + e.message + '）。PDFは保存済みです'); }
 
   return { fileName: pdfName, url: file.getUrl(), folder: folderPath_(folder), pdfBase64: Utilities.base64Encode(pdf.getBytes()), sha256: hash, signedAt: signedYmd + ' ' + signedHm, warnings: warnings };
+}
+
+// ===== 写真アプリで「見積もり中」の案件一覧（契約番号をくるくる選ぶ用）=====
+// 見積もり中＝見送りでなく、請求前で、作業中・完了の写真がまだ無い案件。すでに契約書を締結した番号は外す
+function listEstimateCases(user) {
+  var key = prop_('GENBA_API_KEY');
+  if (!key) throw new Error('写真アプリとの合言葉（GENBA_API_KEY）が未設定です');
+  var res = UrlFetchApp.fetch(GENBA_API_BASE + '/api/external/cases', { headers: { 'x-econtract-key': key }, muteHttpExceptions: true });
+  if (res.getResponseCode() !== 200) throw new Error('写真アプリから一覧を読めませんでした（' + res.getResponseCode() + '）');
+  var cases = (JSON.parse(res.getContentText()).cases || []);
+  var signed = {};
+  try {
+    var sh = sheet_();
+    if (sh.getLastRow() >= 2) sh.getRange(2, 1, sh.getLastRow() - 1, 1).getValues().forEach(function (r) { signed[String(r[0]).trim().replace(/^(\d{2}-\d{4})-\d{1,2}$/, '$1')] = true; });
+  } catch (e) {}
+  return { rows: cases.filter(function (x) { return !signed[x.case_no]; }).map(function (x) {
+    return { caseNo: x.case_no, name: x.name || '', custName: x.client_name || '', city: x.city || '', type: x.type || '', workDate: x.work_date || '', status: x.status || '' };
+  }) };
 }
 
 // ===== 現場写真アプリから案件情報を読む（契約番号＝案件番号）=====
